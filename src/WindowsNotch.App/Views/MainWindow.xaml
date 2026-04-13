@@ -141,7 +141,7 @@
                                                    FontSize="12"
                                                    FontWeight="SemiBold"
                                                    Foreground="{StaticResource SubtleBrush}"
-                                                   Text="AirDrop" />
+                                                   Text="iCloud Drive" />
                                     </StackPanel>
                                 </Border>
                             </Grid>

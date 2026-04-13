@@ -9,6 +9,7 @@ namespace WindowsNotch.App;
 
 public partial class SettingsWindow : Window
 {
+    private const double SurfaceCornerRadius = 20;
     private readonly ICloudDriveLocator _iCloudDriveLocator;
 
     public SettingsWindow(AppSettings settings, ICloudDriveLocator iCloudDriveLocator)
@@ -17,6 +18,7 @@ public partial class SettingsWindow : Window
 
         _iCloudDriveLocator = iCloudDriveLocator;
         LaunchAtStartupCheckBox.IsChecked = settings.LaunchAtStartup;
+        UpdateWindowClip();
     }
 
     public bool ShouldExitAfterClose { get; private set; }
@@ -30,8 +32,8 @@ public partial class SettingsWindow : Window
     private void OpenShareGuideButton_Click(object sender, RoutedEventArgs e)
     {
         var folderText = _iCloudDriveLocator.TryResolveWindowsNotchFolder(out var folderPath)
-            ? $"Shared folder\n{folderPath}\n\nThis app currently shares through iCloud Drive, not native AirDrop."
-            : "Shared folder\niCloud Drive\\WindowsNotch\n\nTurn on iCloud Drive in iCloud for Windows first. This app currently shares through iCloud Drive, not native AirDrop.";
+            ? folderPath
+            : "iCloud Drive\\WindowsNotch\n\nTurn on iCloud Drive in iCloud for Windows first.";
 
         var guideWindow = new ShareGuideWindow(folderText)
         {
@@ -81,9 +83,21 @@ public partial class SettingsWindow : Window
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ChangedButton == MouseButton.Left)
+        WindowSurfaceHelper.HandleWindowDragMove(this, e);
+    }
+
+    private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateWindowClip();
+    }
+
+    private void UpdateWindowClip()
+    {
+        if (!IsLoaded)
         {
-            DragMove();
+            return;
         }
+
+        WindowSurfaceHelper.UpdateClip(WindowSurfaceBorder, SurfaceCornerRadius);
     }
 }

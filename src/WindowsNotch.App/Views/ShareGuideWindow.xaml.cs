@@ -5,10 +5,13 @@ namespace WindowsNotch.App;
 
 public partial class ShareGuideWindow : Window
 {
+    private const double SurfaceCornerRadius = 20;
+
     public ShareGuideWindow(string folderPathText)
     {
         InitializeComponent();
         FolderPathTextBlock.Text = folderPathText;
+        UpdateWindowClip();
     }
 
     private void OkButton_Click(object sender, RoutedEventArgs e)
@@ -23,9 +26,21 @@ public partial class ShareGuideWindow : Window
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ChangedButton == MouseButton.Left)
+        WindowSurfaceHelper.HandleWindowDragMove(this, e);
+    }
+
+    private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateWindowClip();
+    }
+
+    private void UpdateWindowClip()
+    {
+        if (!IsLoaded)
         {
-            DragMove();
+            return;
         }
+
+        WindowSurfaceHelper.UpdateClip(WindowSurfaceBorder, SurfaceCornerRadius);
     }
 }

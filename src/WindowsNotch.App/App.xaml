@@ -1,7 +1,7 @@
 <Application x:Class="WindowsNotch.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             StartupUri="MainWindow.xaml">
+             StartupUri="Views/MainWindow.xaml">
     <Application.Resources>
         <LinearGradientBrush x:Key="NotchBackgroundBrush"
                              StartPoint="0,0"
@@ -20,5 +20,243 @@
         <SolidColorBrush x:Key="AccentFillBrush" Color="#305A9CFF" />
         <SolidColorBrush x:Key="SubtleBrush" Color="#E8F5F5F7" />
         <SolidColorBrush x:Key="MutedBrush" Color="#8AF5F5F7" />
+
+        <Style x:Key="TrafficLightButtonStyle"
+               TargetType="Button">
+            <Setter Property="Width"
+                    Value="12" />
+            <Setter Property="Height"
+                    Value="12" />
+            <Setter Property="Margin"
+                    Value="0,0,8,0" />
+            <Setter Property="Padding"
+                    Value="0" />
+            <Setter Property="BorderThickness"
+                    Value="0" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="6" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RoundedActionButtonStyle"
+               TargetType="Button">
+            <Setter Property="MinHeight"
+                    Value="40" />
+            <Setter Property="Padding"
+                    Value="14,9" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="Foreground"
+                    Value="{StaticResource SubtleBrush}" />
+            <Setter Property="Background"
+                    Value="#14FFFFFF" />
+            <Setter Property="BorderBrush"
+                    Value="#1EFFFFFF" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="Chrome"
+                                        Property="Opacity"
+                                        Value="0.92" />
+                            </Trigger>
+                            <Trigger Property="IsPressed"
+                                     Value="True">
+                                <Setter TargetName="Chrome"
+                                        Property="Opacity"
+                                        Value="0.82" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryRoundedActionButtonStyle"
+               BasedOn="{StaticResource RoundedActionButtonStyle}"
+               TargetType="Button">
+            <Setter Property="Foreground"
+                    Value="White" />
+            <Setter Property="Background"
+                    Value="#FF3478F6" />
+            <Setter Property="BorderBrush"
+                    Value="#FF3478F6" />
+        </Style>
+
+        <Style x:Key="PrimaryCompactActionButtonStyle"
+               BasedOn="{StaticResource PrimaryRoundedActionButtonStyle}"
+               TargetType="Button">
+            <Setter Property="MinWidth"
+                    Value="92" />
+            <Setter Property="Padding"
+                    Value="16,9" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="14">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="Chrome"
+                                        Property="Opacity"
+                                        Value="0.92" />
+                            </Trigger>
+                            <Trigger Property="IsPressed"
+                                     Value="True">
+                                <Setter TargetName="Chrome"
+                                        Property="Opacity"
+                                        Value="0.82" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ToggleSwitchStyle"
+               TargetType="CheckBox">
+            <Setter Property="Focusable"
+                    Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Width="46"
+                              Height="28">
+                            <Border x:Name="Track"
+                                    CornerRadius="14"
+                                    BorderThickness="1">
+                                <Border.Background>
+                                    <SolidColorBrush Color="#24FFFFFF" />
+                                </Border.Background>
+                                <Border.BorderBrush>
+                                    <SolidColorBrush Color="#18FFFFFF" />
+                                </Border.BorderBrush>
+                            </Border>
+                            <Border x:Name="Thumb"
+                                    Width="22"
+                                    Height="22"
+                                    Margin="3,0,0,0"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Background="#FFF7F7F8"
+                                    CornerRadius="11">
+                                <Border.RenderTransform>
+                                    <TranslateTransform x:Name="ThumbTranslateTransform" />
+                                </Border.RenderTransform>
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked"
+                                     Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ThumbTranslateTransform"
+                                                             Storyboard.TargetProperty="X"
+                                                             To="18"
+                                                             Duration="0:0:0.16">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseInOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <ColorAnimation Storyboard.TargetName="Track"
+                                                            Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                            To="#FF3478F6"
+                                                            Duration="0:0:0.16">
+                                                <ColorAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseInOut" />
+                                                </ColorAnimation.EasingFunction>
+                                            </ColorAnimation>
+                                            <ColorAnimation Storyboard.TargetName="Track"
+                                                            Storyboard.TargetProperty="(Border.BorderBrush).(SolidColorBrush.Color)"
+                                                            To="#FF3478F6"
+                                                            Duration="0:0:0.16">
+                                                <ColorAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseInOut" />
+                                                </ColorAnimation.EasingFunction>
+                                            </ColorAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ThumbTranslateTransform"
+                                                             Storyboard.TargetProperty="X"
+                                                             To="0"
+                                                             Duration="0:0:0.16">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseInOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <ColorAnimation Storyboard.TargetName="Track"
+                                                            Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                            To="#24FFFFFF"
+                                                            Duration="0:0:0.16">
+                                                <ColorAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseInOut" />
+                                                </ColorAnimation.EasingFunction>
+                                            </ColorAnimation>
+                                            <ColorAnimation Storyboard.TargetName="Track"
+                                                            Storyboard.TargetProperty="(Border.BorderBrush).(SolidColorBrush.Color)"
+                                                            To="#18FFFFFF"
+                                                            Duration="0:0:0.16">
+                                                <ColorAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseInOut" />
+                                                </ColorAnimation.EasingFunction>
+                                            </ColorAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="GuideStepBadgeStyle"
+               TargetType="Border">
+            <Setter Property="Width"
+                    Value="22" />
+            <Setter Property="Height"
+                    Value="22" />
+            <Setter Property="CornerRadius"
+                    Value="11" />
+            <Setter Property="Background"
+                    Value="#14FFFFFF" />
+            <Setter Property="BorderBrush"
+                    Value="#18FFFFFF" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
+        </Style>
     </Application.Resources>
 </Application>

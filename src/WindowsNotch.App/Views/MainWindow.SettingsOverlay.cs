@@ -1,0 +1,246 @@
+using System.Runtime.InteropServices;
+using System.Windows;
+using System.Windows.Media.Animation;
+using WindowsNotch.App.Models;
+
+namespace WindowsNotch.App;
+
+public partial class MainWindow
+{
+    private void SettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        _lastInteractiveUtc = DateTime.UtcNow;
+
+        var wasHoverTimerRunning = _hoverTimer.IsEnabled;
+        _hoverTimer.Stop();
+        UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: true));
+
+        try
+        {
+            var settingsWindow = new SettingsWindow(CreateSettingsSnapshot(), _iCloudDriveLocator)
+            {
+                Owner = this,
+            };
+
+            if (settingsWindow.ShowDialog() != true)
+            {
+                return;
+            }
+
+            ApplySettings(settingsWindow.ResultSettings);
+
+            if (settingsWindow.ShouldExitAfterClose)
+            {
+                Application.Current.Shutdown();
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "WindowsNotch", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            if (wasHoverTimerRunning)
+            {
+                _hoverTimer.Start();
+            }
+
+            _lastInteractiveUtc = DateTime.UtcNow;
+        }
+    }
+
+    private AppSettings CreateSettingsSnapshot()
+    {
+        return new AppSettings
+        {
+            LaunchAtStartup = _settings.LaunchAtStartup,
+        };
+    }
+
+    private void ApplySettings(AppSettings settings)
+    {
+        _startupRegistrationService.SetEnabled(settings.LaunchAtStartup);
+        settings.LaunchAtStartup = _startupRegistrationService.IsEnabled();
+        _settings = settings;
+        _settingsService.Save(_settings);
+    }
+
+    private void ApplyWindowModeSettings()
+    {
+        UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: false));
+    }
+
+    private bool ShouldDisplayOverlay(bool isInteractive)
+    {
+        if (_isShelfItemDragActive)
+        {
+            return false;
+        }
+
+        return isInteractive ||
+               _isExpanded ||
+               _isCollapseAnimationActive ||
+               !IsOtherWindowCoveringNotchArea();
+    }
+
+    private bool IsOtherWindowCoveringNotchArea()
+    {
+        if (_windowHandle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        var foregroundWindowHandle = GetForegroundWindow();
+        if (foregroundWindowHandle == IntPtr.Zero || foregroundWindowHandle == _windowHandle)
+        {
+            return false;
+        }
+
+        if (!IsWindowVisible(foregroundWindowHandle) || IsIconic(foregroundWindowHandle))
+        {
+            return false;
+        }
+
+        if (!GetWindowRect(foregroundWindowHandle, out var windowRect))
+        {
+            return false;
+        }
+
+        var monitorHandle = MonitorFromWindow(foregroundWindowHandle, MONITOR_DEFAULTTONEAREST);
+        if (monitorHandle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        var monitorInfo = new MonitorInfo
+        {
+            cbSize = Marshal.SizeOf<MonitorInfo>(),
+        };
+
+        if (!GetMonitorInfo(monitorHandle, ref monitorInfo))
+        {
+            return false;
+        }
+
+        var notchLeft = GetWindowLeft(CollapsedWidth) + WindowHorizontalMargin;
+        var notchTop = monitorInfo.Monitor.Top;
+        var notchRight = GetWindowLeft(CollapsedWidth) + CollapsedWidth - WindowHorizontalMargin;
+        var notchBottom = monitorInfo.Monitor.Top + CollapsedHeight;
+
+        var intersectsHorizontally =
+            windowRect.Right > notchLeft &&
+            windowRect.Left < notchRight;
+        var intersectsVertically =
+            windowRect.Bottom > notchTop &&
+            windowRect.Top < notchBottom;
+
+        return intersectsHorizontally && intersectsVertically;
+    }
+
+    private void UpdateOverlayMode(bool overlayModeActive, bool immediateTopUpdate = false)
+    {
+        if (_isOverlayModeActive == overlayModeActive)
+        {
+            if (immediateTopUpdate)
+            {
+                ApplyWindowTop(GetWindowTop(overlayModeActive));
+            }
+
+            return;
+        }
+
+        _isOverlayModeActive = overlayModeActive;
+        Topmost = overlayModeActive;
+
+        if (immediateTopUpdate)
+        {
+            ApplyWindowTop(GetWindowTop(overlayModeActive));
+        }
+        else
+        {
+            AnimateWindowDimension(TopProperty, GetWindowTop(overlayModeActive), CollapseAnimationMilliseconds, new CubicEase
+            {
+                EasingMode = EasingMode.EaseOut,
+            });
+        }
+
+        if (overlayModeActive)
+        {
+            if (!_topmostTimer.IsEnabled)
+            {
+                _topmostTimer.Start();
+            }
+
+            UpdateWindowZOrder(HWND_TOPMOST);
+            return;
+        }
+
+        if (_topmostTimer.IsEnabled)
+        {
+            _topmostTimer.Stop();
+        }
+
+        UpdateWindowZOrder(HWND_NOTOPMOST);
+    }
+
+    private void UpdateWindowZOrder(IntPtr windowOrder)
+    {
+        if (_windowHandle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        SetWindowPos(
+            _windowHandle,
+            windowOrder,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    }
+
+    private void ApplyWindowBounds(double left, double top, double width, double height)
+    {
+        BeginAnimation(TopProperty, null);
+        BeginAnimation(LeftProperty, null);
+        BeginAnimation(WidthProperty, null);
+        BeginAnimation(HeightProperty, null);
+
+        if (_windowHandle != IntPtr.Zero)
+        {
+            SetWindowPos(
+                _windowHandle,
+                IntPtr.Zero,
+                (int)Math.Round(left),
+                (int)Math.Round(top),
+                (int)Math.Round(width),
+                (int)Math.Round(height),
+                SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        }
+
+        SetCurrentValue(LeftProperty, left);
+        SetCurrentValue(TopProperty, top);
+        SetCurrentValue(WidthProperty, width);
+        SetCurrentValue(HeightProperty, height);
+    }
+
+    private void ApplyWindowTop(double top)
+    {
+        BeginAnimation(TopProperty, null);
+
+        if (_windowHandle != IntPtr.Zero)
+        {
+            SetWindowPos(
+                _windowHandle,
+                IntPtr.Zero,
+                (int)Math.Round(Left),
+                (int)Math.Round(top),
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        }
+
+        SetCurrentValue(TopProperty, top);
+    }
+}
