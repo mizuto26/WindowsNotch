@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace WindowsNotch.App;
 
@@ -26,7 +27,12 @@ public partial class ShareGuideWindow : Window
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        WindowSurfaceHelper.HandleWindowDragMove(this, e);
+        if (e.ChangedButton != MouseButton.Left)
+        {
+            return;
+        }
+
+        DragMove();
     }
 
     private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -36,11 +42,14 @@ public partial class ShareGuideWindow : Window
 
     private void UpdateWindowClip()
     {
-        if (!IsLoaded)
+        if (!IsLoaded || WindowSurfaceBorder.ActualWidth <= 0 || WindowSurfaceBorder.ActualHeight <= 0)
         {
             return;
         }
 
-        WindowSurfaceHelper.UpdateClip(WindowSurfaceBorder, SurfaceCornerRadius);
+        WindowSurfaceBorder.Clip = new RectangleGeometry(
+            new Rect(0, 0, WindowSurfaceBorder.ActualWidth, WindowSurfaceBorder.ActualHeight),
+            SurfaceCornerRadius,
+            SurfaceCornerRadius);
     }
 }
