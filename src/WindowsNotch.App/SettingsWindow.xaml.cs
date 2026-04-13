@@ -27,6 +27,20 @@ public partial class SettingsWindow : Window
             LaunchAtStartup = LaunchAtStartupCheckBox.IsChecked == true,
         };
 
+    private void OpenShareGuideButton_Click(object sender, RoutedEventArgs e)
+    {
+        var folderText = _iCloudDriveLocator.TryResolveWindowsNotchFolder(out var folderPath)
+            ? $"Shared folder\n{folderPath}\n\nThis app currently shares through iCloud Drive, not native AirDrop."
+            : "Shared folder\niCloud Drive\\WindowsNotch\n\nTurn on iCloud Drive in iCloud for Windows first. This app currently shares through iCloud Drive, not native AirDrop.";
+
+        var guideWindow = new ShareGuideWindow(folderText)
+        {
+            Owner = this,
+        };
+
+        guideWindow.ShowDialog();
+    }
+
     private void OpenICloudFolderButton_Click(object sender, RoutedEventArgs e)
     {
         if (!_iCloudDriveLocator.TryResolveWindowsNotchFolder(out var folderPath))

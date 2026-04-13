@@ -24,7 +24,14 @@
                 Background="{StaticResource NotchBackgroundBrush}"
                 BorderBrush="{StaticResource NotchBorderBrush}"
                 BorderThickness="1,0,1,1"
-                CornerRadius="0,0,24,24">
+                CornerRadius="0"
+                RenderTransformOrigin="0.5,0"
+                SizeChanged="NotchBody_SizeChanged">
+            <Border.RenderTransform>
+                <ScaleTransform x:Name="NotchScaleTransform"
+                                ScaleX="1"
+                                ScaleY="1" />
+            </Border.RenderTransform>
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="30" />
@@ -59,10 +66,20 @@
                         Grid.Row="1"
                         Margin="12,2,12,12"
                         Height="0"
-                        Opacity="1"
+                        Opacity="0"
                         Background="Transparent"
                         ClipToBounds="True">
-                    <Grid x:Name="ExpandedContentRoot">
+                    <Grid x:Name="ExpandedContentRoot"
+                          RenderTransformOrigin="0.5,0">
+                        <Grid.RenderTransform>
+                            <TransformGroup>
+                                <ScaleTransform x:Name="ExpandedContentScaleTransform"
+                                                ScaleX="0.97"
+                                                ScaleY="0.9" />
+                                <TranslateTransform x:Name="ExpandedContentTranslateTransform"
+                                                    Y="-6" />
+                            </TransformGroup>
+                        </Grid.RenderTransform>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="198" />
                             <ColumnDefinition Width="12" />
@@ -90,27 +107,34 @@
                                         BorderBrush="{StaticResource PanelInnerBorderBrush}"
                                         BorderThickness="1">
                                     <StackPanel VerticalAlignment="Center">
-                                        <Grid Width="38"
-                                              Height="38"
-                                              HorizontalAlignment="Center">
-                                            <Ellipse Stroke="{StaticResource AccentBrush}"
-                                                     StrokeThickness="1.5"
-                                                     Opacity="0.9" />
-                                            <Ellipse Width="16"
-                                                     Height="16"
-                                                     Margin="10,10,0,0"
-                                                     HorizontalAlignment="Left"
-                                                     VerticalAlignment="Top"
-                                                     Stroke="{StaticResource AccentBrush}"
-                                                     StrokeThickness="1.5"
-                                                     Opacity="0.82" />
-                                            <Ellipse Width="6"
-                                                     Height="6"
-                                                     Margin="23,8,0,0"
-                                                     HorizontalAlignment="Left"
-                                                     VerticalAlignment="Top"
-                                                     Fill="{StaticResource AccentBrush}" />
-                                        </Grid>
+                                        <Viewbox Width="38"
+                                                 Height="38"
+                                                 HorizontalAlignment="Center"
+                                                 Stretch="Uniform">
+                                            <Canvas Width="38"
+                                                    Height="38">
+                                                <Path Stroke="{StaticResource AccentBrush}"
+                                                      StrokeThickness="1.7"
+                                                      StrokeStartLineCap="Round"
+                                                      StrokeEndLineCap="Round"
+                                                      Data="M 10 26 C 14 20, 18 17, 25 14" />
+                                                <Path Stroke="{StaticResource AccentBrush}"
+                                                      StrokeThickness="1.7"
+                                                      StrokeStartLineCap="Round"
+                                                      StrokeEndLineCap="Round"
+                                                      Data="M 13 13 C 19 18, 22 21, 27 28" />
+                                                <Ellipse Width="7"
+                                                         Height="7"
+                                                         Canvas.Left="6"
+                                                         Canvas.Top="22"
+                                                         Fill="{StaticResource AccentBrush}" />
+                                                <Ellipse Width="7"
+                                                         Height="7"
+                                                         Canvas.Left="25"
+                                                         Canvas.Top="9"
+                                                         Fill="{StaticResource AccentBrush}" />
+                                            </Canvas>
+                                        </Viewbox>
 
                                         <TextBlock Margin="0,8,0,0"
                                                    HorizontalAlignment="Center"
@@ -147,28 +171,26 @@
                                             BorderThickness="1"
                                             VerticalAlignment="Top">
                                         <StackPanel VerticalAlignment="Center">
-                                            <Grid Width="38"
-                                                  Height="38"
-                                                  HorizontalAlignment="Center">
-                                                <Border Margin="6,10,6,7"
-                                                        CornerRadius="6"
-                                                        BorderBrush="{StaticResource AccentBrush}"
-                                                        BorderThickness="1.5" />
-                                                <Path Margin="11,4,11,20"
-                                                      Stroke="{StaticResource AccentBrush}"
-                                                      StrokeThickness="1.5"
-                                                      StrokeStartLineCap="Round"
-                                                      StrokeEndLineCap="Round"
-                                                      Data="M 0 10 L 9 1 L 18 10" />
-                                                <Line X1="19"
-                                                      Y1="5"
-                                                      X2="19"
-                                                      Y2="22"
-                                                      Stroke="{StaticResource AccentBrush}"
-                                                      StrokeThickness="1.5"
-                                                      StrokeStartLineCap="Round"
-                                                      StrokeEndLineCap="Round" />
-                                            </Grid>
+                                            <Viewbox Width="38"
+                                                     Height="38"
+                                                     HorizontalAlignment="Center"
+                                                     Stretch="Uniform">
+                                                <Canvas Width="38"
+                                                        Height="38">
+                                                    <Path Stroke="{StaticResource AccentBrush}"
+                                                          StrokeThickness="1.7"
+                                                          StrokeStartLineCap="Round"
+                                                          StrokeEndLineCap="Round"
+                                                          StrokeLineJoin="Round"
+                                                          Data="M 19 7 L 19 22 M 13 14 L 19 8 L 25 14" />
+                                                    <Path Stroke="{StaticResource AccentBrush}"
+                                                          StrokeThickness="1.7"
+                                                          StrokeStartLineCap="Round"
+                                                          StrokeEndLineCap="Round"
+                                                          StrokeLineJoin="Round"
+                                                          Data="M 9 24 L 9 28 C 9 30.2, 10.8 32, 13 32 L 25 32 C 27.2 32, 29 30.2, 29 28 L 29 24" />
+                                                </Canvas>
+                                            </Viewbox>
                                             <TextBlock Margin="0,8,0,0"
                                                        HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"
@@ -329,6 +351,7 @@
                IsHitTestVisible="False"
                Placement="AbsolutePoint"
                PopupAnimation="None"
+               Opened="DragPreviewPopup_Opened"
                StaysOpen="True">
             <Border Padding="8"
                     CornerRadius="14"

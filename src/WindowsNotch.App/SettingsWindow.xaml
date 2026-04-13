@@ -287,11 +287,18 @@
                                FontSize="12"
                                Foreground="{StaticResource MutedBrush}"
                                Text="Open the iCloud folder used for instant sharing." />
-                    <Button Margin="0,14,0,0"
-                            HorizontalAlignment="Left"
-                            Style="{StaticResource RoundedActionButtonStyle}"
-                            Click="OpenICloudFolderButton_Click"
-                            Content="Open iCloud share folder" />
+                    <StackPanel Margin="0,14,0,0"
+                                Orientation="Horizontal">
+                        <Button HorizontalAlignment="Left"
+                                Style="{StaticResource RoundedActionButtonStyle}"
+                                Click="OpenShareGuideButton_Click"
+                                Content="How to send to iPhone" />
+                        <Button Margin="10,0,0,0"
+                                HorizontalAlignment="Left"
+                                Style="{StaticResource RoundedActionButtonStyle}"
+                                Click="OpenICloudFolderButton_Click"
+                                Content="Open iCloud share folder" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

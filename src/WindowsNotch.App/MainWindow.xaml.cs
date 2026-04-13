@@ -17,15 +17,17 @@ public partial class MainWindow : Window
 {
     private const double WindowHorizontalMargin = 6;
     private const double WindowBottomMargin = 10;
+    private const double VisualBottomCornerRadius = 32;
     private const double CollapsedWidth = 220;
     private const double ExpandedWidth = 620;
     private const double CollapsedHeight = 52;
     private const double ExpandedContentTopSpacing = 6;
     private const double VisibleWindowTopOffset = 0;
-    private const double HiddenRevealHeight = 4;
+    private const double HiddenRevealHeight = 0;
     private const double HotZoneHeight = 6;
     private const double HotZoneHalfWidth = 188;
-    private const int AnimationMilliseconds = 220;
+    private const int ExpandAnimationMilliseconds = 280;
+    private const int CollapseAnimationMilliseconds = 240;
     private const int HoverPollMilliseconds = 16;
     private const int CollapseDelayMilliseconds = 180;
     private const int TopmostRefreshMilliseconds = 500;
@@ -52,6 +54,7 @@ public partial class MainWindow : Window
     private Point _shelfDragStartPoint;
     private ShelfItem? _selectedShelfItem;
     private bool _isOverlayModeActive;
+    private bool _isShelfItemDragActive;
     private AppSettings _settings;
 
     public MainWindow()
@@ -77,7 +80,7 @@ public partial class MainWindow : Window
         };
         _collapseAnimationTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(AnimationMilliseconds + 20),
+            Interval = TimeSpan.FromMilliseconds(CollapseAnimationMilliseconds + 20),
         };
         _dragPreviewTimer = new DispatcherTimer
         {
@@ -93,8 +96,10 @@ public partial class MainWindow : Window
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        Width = CollapsedWidth;
+        Width = ExpandedWidth;
         Height = CollapsedHeight;
+        NotchScaleTransform.ScaleX = GetCollapsedScaleX();
+        NotchScaleTransform.ScaleY = 1.0;
 
         ApplyWindowModeSettings();
         LoadShelfItems();
@@ -109,9 +114,24 @@ public partial class MainWindow : Window
         ApplyWindowModeSettings();
     }
 
+    private void NotchBody_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateAnimatedNotchShape();
+    }
+
     private void HoverTimer_Tick(object? sender, EventArgs e)
     {
+        UpdateAnimatedNotchShape();
+
         var cursorPoint = GetCursorPositionInDeviceIndependentPixels();
+        if (Mouse.LeftButton == MouseButtonState.Pressed &&
+            IsCursorInHotZone(cursorPoint))
+        {
+            _lastInteractiveUtc = DateTime.UtcNow;
+            UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: true));
+            SetExpanded(true);
+        }
+
         var isInteractive =
             _isDragOver ||
             _isShareDropTargetActive ||
@@ -156,7 +176,18 @@ public partial class MainWindow : Window
     {
         _collapseAnimationTimer.Stop();
         _isCollapseAnimationActive = false;
-        SettingsButton.Visibility = _isExpanded ? Visibility.Visible : Visibility.Collapsed;
+        ApplyNotchStateWithoutFade(() =>
+        {
+            NotchScaleTransform.ScaleX = GetCollapsedScaleX();
+            NotchScaleTransform.ScaleY = 1.0;
+            ExpandedContentViewport.Height = 0.0;
+            ExpandedContentViewport.Opacity = 0.0;
+            ExpandedContentScaleTransform.ScaleX = 0.97;
+            ExpandedContentScaleTransform.ScaleY = 0.9;
+            ExpandedContentTranslateTransform.Y = -6.0;
+            ApplyWindowBounds(GetWindowLeft(ExpandedWidth), Top, ExpandedWidth, CollapsedHeight);
+            UpdateAnimatedNotchShape();
+        });
         UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: false));
     }
 
@@ -168,13 +199,14 @@ public partial class MainWindow : Window
 
     private bool IsCursorOverNotchBody(Point cursorPoint)
     {
-        var hoverWidth = (_isExpanded || _isCollapseAnimationActive) ? ExpandedWidth : CollapsedWidth;
-        var hoverHeight = (_isExpanded || _isCollapseAnimationActive) ? _expandedWindowHeight : CollapsedHeight;
-        var hoverLeft = GetWindowLeft(hoverWidth);
-        var bodyLeft = hoverLeft + WindowHorizontalMargin;
+        var scaleX = Math.Max(0.001, NotchScaleTransform.ScaleX);
+        var scaleY = Math.Max(0.001, NotchScaleTransform.ScaleY);
+        var bodyWidth = NotchBody.ActualWidth * scaleX;
+        var bodyHeight = NotchBody.ActualHeight * scaleY;
+        var bodyLeft = Left + WindowHorizontalMargin + Math.Max(0.0, (NotchBody.ActualWidth - bodyWidth) / 2.0);
         var bodyTop = Top;
-        var bodyRight = hoverLeft + hoverWidth - WindowHorizontalMargin;
-        var bodyBottom = Top + hoverHeight - WindowBottomMargin;
+        var bodyRight = bodyLeft + bodyWidth;
+        var bodyBottom = bodyTop + bodyHeight;
 
         return cursorPoint.X >= bodyLeft &&
                cursorPoint.X <= bodyRight &&
@@ -194,43 +226,163 @@ public partial class MainWindow : Window
 
         if (expanded)
         {
-            SettingsButton.Visibility = Visibility.Visible;
-        }
-
-        var targetWidth = expanded ? ExpandedWidth : CollapsedWidth;
-        var targetHeight = expanded ? _expandedWindowHeight : CollapsedHeight;
-        var targetContentHeight = expanded ? _expandedContentHeight : 0.0;
-
-        if (expanded)
-        {
+            SettingsButton.Visibility = Visibility.Collapsed;
+            ExpandedContentViewport.Opacity = 0.0;
             _collapseAnimationTimer.Stop();
+            ApplyExpandedWindowState(() =>
+            {
+                ApplyWindowBounds(Left, GetWindowTop(overlayModeActive: true), ExpandedWidth, _expandedWindowHeight);
+                ExpandedContentViewport.Height = _expandedContentHeight;
+                ExpandedContentScaleTransform.ScaleX = 0.97;
+                ExpandedContentScaleTransform.ScaleY = 0.9;
+                ExpandedContentTranslateTransform.Y = -6.0;
+            });
         }
         else
         {
+            SettingsButton.Visibility = Visibility.Collapsed;
             _collapseAnimationTimer.Stop();
             _collapseAnimationTimer.Start();
         }
 
-        UpdateOverlayMode(ShouldDisplayOverlay(expanded || _isDragOver || _isShareDropTargetActive || _isShelfDropTargetActive));
+        var animationDuration = expanded ? ExpandAnimationMilliseconds : CollapseAnimationMilliseconds;
+        var targetNotchScaleX = expanded ? 1.0 : GetCollapsedScaleX();
+        var targetNotchScaleY = expanded ? 1.0 : GetCollapsedScaleY();
+        var targetOpacity = expanded ? 1.0 : 0.0;
+        var targetScaleX = expanded ? 1.0 : 0.97;
+        var targetScaleY = expanded ? 1.0 : 0.9;
+        var targetTranslateY = expanded ? 0.0 : -6.0;
 
-        AnimateWindowDimension(WidthProperty, targetWidth);
-        AnimateWindowDimension(HeightProperty, targetHeight);
-        AnimateWindowDimension(LeftProperty, GetWindowLeft(targetWidth));
-        AnimateElementDimension(ExpandedContentViewport, FrameworkElement.HeightProperty, targetContentHeight);
+        UpdateOverlayMode(
+            ShouldDisplayOverlay(expanded || _isDragOver || _isShareDropTargetActive || _isShelfDropTargetActive),
+            immediateTopUpdate: expanded);
+
+        if (!expanded)
+        {
+            ExpandedContentViewport.BeginAnimation(FrameworkElement.HeightProperty, null);
+            ExpandedContentViewport.BeginAnimation(UIElement.OpacityProperty, null);
+            ExpandedContentScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            ExpandedContentScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            ExpandedContentTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+
+            ExpandedContentViewport.Height = 0.0;
+            ExpandedContentViewport.Opacity = 0.0;
+            ExpandedContentScaleTransform.ScaleX = targetScaleX;
+            ExpandedContentScaleTransform.ScaleY = targetScaleY;
+            ExpandedContentTranslateTransform.Y = targetTranslateY;
+        }
+
+        AnimateElementDimension(NotchScaleTransform, ScaleTransform.ScaleXProperty, targetNotchScaleX, animationDuration, new QuinticEase
+        {
+            EasingMode = EasingMode.EaseOut,
+        });
+        AnimateElementDimension(NotchScaleTransform, ScaleTransform.ScaleYProperty, targetNotchScaleY, animationDuration, new ExponentialEase
+        {
+            EasingMode = EasingMode.EaseOut,
+            Exponent = 5,
+        });
+
+        if (expanded)
+        {
+            AnimateElementDimension(ExpandedContentViewport, UIElement.OpacityProperty, targetOpacity, animationDuration, new QuadraticEase
+            {
+                EasingMode = EasingMode.EaseOut,
+            });
+            AnimateElementDimension(ExpandedContentScaleTransform, ScaleTransform.ScaleXProperty, targetScaleX, animationDuration, new QuinticEase
+            {
+                EasingMode = EasingMode.EaseOut,
+            });
+            AnimateElementDimension(ExpandedContentScaleTransform, ScaleTransform.ScaleYProperty, targetScaleY, animationDuration, new ExponentialEase
+            {
+                EasingMode = EasingMode.EaseOut,
+                Exponent = 5,
+            });
+            AnimateElementDimension(ExpandedContentTranslateTransform, TranslateTransform.YProperty, targetTranslateY, animationDuration, new CubicEase
+            {
+                EasingMode = EasingMode.EaseOut,
+            });
+        }
     }
 
-    private void AnimateWindowDimension(DependencyProperty property, double targetValue)
+    private static void AnimateElementDimension(
+        DependencyObject element,
+        DependencyProperty property,
+        double targetValue,
+        int durationMilliseconds,
+        IEasingFunction easingFunction)
+    {
+        var animation = new DoubleAnimation
+        {
+            From = (double)element.GetValue(property),
+            To = targetValue,
+            Duration = TimeSpan.FromMilliseconds(durationMilliseconds),
+            FillBehavior = FillBehavior.Stop,
+            EasingFunction = easingFunction,
+        };
+
+        animation.Completed += (_, _) =>
+        {
+            if (element is IAnimatable animatable)
+            {
+                animatable.BeginAnimation(property, null);
+            }
+
+            element.SetValue(property, targetValue);
+        };
+
+        if (element is IAnimatable animatableElement)
+        {
+            animatableElement.BeginAnimation(property, animation, HandoffBehavior.SnapshotAndReplace);
+        }
+    }
+
+    private void UpdateAnimatedNotchShape()
+    {
+        var scaleX = Math.Max(0.001, NotchScaleTransform.ScaleX);
+        var scaleY = Math.Max(0.001, NotchScaleTransform.ScaleY);
+        var radiusX = VisualBottomCornerRadius / scaleX;
+        var radiusY = VisualBottomCornerRadius / scaleY;
+        NotchBody.Clip = CreateNotchClipGeometry(NotchBody.ActualWidth, NotchBody.ActualHeight, radiusX, radiusY);
+    }
+
+    private void ApplyNotchStateWithoutFade(Action updateAction)
+    {
+        updateAction();
+        Dispatcher.BeginInvoke(() =>
+        {
+            UpdateLayout();
+            UpdateAnimatedNotchShape();
+        }, DispatcherPriority.Render);
+    }
+
+    private void ApplyExpandedWindowState(Action updateAction)
+    {
+        NotchBody.Opacity = 0.0;
+        updateAction();
+        Dispatcher.BeginInvoke(() =>
+        {
+            UpdateLayout();
+            NotchScaleTransform.ScaleX = GetCollapsedScaleX();
+            NotchScaleTransform.ScaleY = GetCollapsedScaleY();
+            UpdateAnimatedNotchShape();
+            NotchBody.Opacity = 1.0;
+            SettingsButton.Visibility = Visibility.Visible;
+        }, DispatcherPriority.Render);
+    }
+
+    private void AnimateWindowDimension(
+        DependencyProperty property,
+        double targetValue,
+        int durationMilliseconds,
+        IEasingFunction easingFunction)
     {
         var animation = new DoubleAnimation
         {
             From = (double)GetValue(property),
             To = targetValue,
-            Duration = TimeSpan.FromMilliseconds(AnimationMilliseconds),
+            Duration = TimeSpan.FromMilliseconds(durationMilliseconds),
             FillBehavior = FillBehavior.Stop,
-            EasingFunction = new CubicEase
-            {
-                EasingMode = EasingMode.EaseInOut,
-            },
+            EasingFunction = easingFunction,
         };
 
         animation.Completed += (_, _) =>
@@ -242,34 +394,69 @@ public partial class MainWindow : Window
         BeginAnimation(property, animation, HandoffBehavior.SnapshotAndReplace);
     }
 
-    private static void AnimateElementDimension(FrameworkElement element, DependencyProperty property, double targetValue)
+    private static Geometry CreateNotchClipGeometry(double width, double height, double bottomRadiusX, double bottomRadiusY)
     {
-        var animation = new DoubleAnimation
+        if (width <= 0 || height <= 0)
         {
-            From = (double)element.GetValue(property),
-            To = targetValue,
-            Duration = TimeSpan.FromMilliseconds(AnimationMilliseconds),
-            FillBehavior = FillBehavior.Stop,
-            EasingFunction = new CubicEase
-            {
-                EasingMode = EasingMode.EaseInOut,
-            },
-        };
+            return Geometry.Empty;
+        }
 
-        animation.Completed += (_, _) =>
+        var radiusX = Math.Min(bottomRadiusX, width / 2.0);
+        var radiusY = Math.Min(bottomRadiusY, height);
+
+        var geometry = new StreamGeometry();
+
+        using (var context = geometry.Open())
         {
-            element.BeginAnimation(property, null);
-            element.SetCurrentValue(property, targetValue);
-        };
+            context.BeginFigure(new Point(0, 0), isFilled: true, isClosed: true);
+            context.LineTo(new Point(width, 0), isStroked: true, isSmoothJoin: false);
+            context.LineTo(new Point(width, height - radiusY), isStroked: true, isSmoothJoin: false);
+            context.ArcTo(
+                new Point(width - radiusX, height),
+                new Size(radiusX, radiusY),
+                0,
+                isLargeArc: false,
+                SweepDirection.Clockwise,
+                isStroked: true,
+                isSmoothJoin: true);
+            context.LineTo(new Point(radiusX, height), isStroked: true, isSmoothJoin: false);
+            context.ArcTo(
+                new Point(0, height - radiusY),
+                new Size(radiusX, radiusY),
+                0,
+                isLargeArc: false,
+                SweepDirection.Clockwise,
+                isStroked: true,
+                isSmoothJoin: true);
+        }
 
-        element.BeginAnimation(property, animation, HandoffBehavior.SnapshotAndReplace);
+        geometry.Freeze();
+        return geometry;
+    }
+
+    private double GetCollapsedScaleX()
+    {
+        var collapsedBodyWidth = CollapsedWidth - (WindowHorizontalMargin * 2.0);
+        var expandedBodyWidth = ExpandedWidth - (WindowHorizontalMargin * 2.0);
+        return collapsedBodyWidth / expandedBodyWidth;
+    }
+
+    private double GetCollapsedScaleY()
+    {
+        var collapsedBodyHeight = CollapsedHeight - WindowBottomMargin;
+        var expandedBodyHeight = _expandedWindowHeight - WindowBottomMargin;
+        return expandedBodyHeight <= 0
+            ? 1.0
+            : collapsedBodyHeight / expandedBodyHeight;
     }
 
     private void PositionWindow()
     {
-        Left = GetWindowLeft(Width);
+        Width = ExpandedWidth;
+        Left = GetWindowLeft(ExpandedWidth);
         Top = GetWindowTop(overlayModeActive: ShouldDisplayOverlay(isInteractive: false));
         SettingsButton.Visibility = Visibility.Collapsed;
+        UpdateAnimatedNotchShape();
         UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: false));
     }
 
@@ -465,6 +652,8 @@ public partial class MainWindow : Window
     {
         var data = new DataObject(DataFormats.FileDrop, new[] { item.StoredPath });
         ShowDragPreview(item);
+        _isShelfItemDragActive = true;
+        UpdateOverlayMode(overlayModeActive: false, immediateTopUpdate: true);
 
         try
         {
@@ -472,7 +661,9 @@ public partial class MainWindow : Window
         }
         finally
         {
+            _isShelfItemDragActive = false;
             HideDragPreview();
+            UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: false), immediateTopUpdate: true);
         }
     }
 
@@ -616,6 +807,11 @@ public partial class MainWindow : Window
         DragPreviewPopup.IsOpen = false;
     }
 
+    private void DragPreviewPopup_Opened(object sender, EventArgs e)
+    {
+        Dispatcher.BeginInvoke(EnsureDragPreviewPopupTopmost, DispatcherPriority.Render);
+    }
+
     private void DragPreviewTimer_Tick(object? sender, EventArgs e)
     {
         UpdateDragPreviewPosition();
@@ -637,6 +833,28 @@ public partial class MainWindow : Window
 
         DragPreviewPopup.HorizontalOffset = cursorPoint.X;
         DragPreviewPopup.VerticalOffset = cursorPoint.Y;
+    }
+
+    private void EnsureDragPreviewPopupTopmost()
+    {
+        if (DragPreviewPopup.Child is not FrameworkElement child)
+        {
+            return;
+        }
+
+        if (PresentationSource.FromVisual(child) is not HwndSource popupSource)
+        {
+            return;
+        }
+
+        SetWindowPos(
+            popupSource.Handle,
+            HWND_TOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
     }
 
     private AppSettings CreateSettingsSnapshot()
@@ -662,13 +880,18 @@ public partial class MainWindow : Window
 
     private bool ShouldDisplayOverlay(bool isInteractive)
     {
+        if (_isShelfItemDragActive)
+        {
+            return false;
+        }
+
         return isInteractive ||
                _isExpanded ||
                _isCollapseAnimationActive ||
-               !IsOtherWindowFullscreen();
+               !IsOtherWindowCoveringNotchArea();
     }
 
-    private bool IsOtherWindowFullscreen()
+    private bool IsOtherWindowCoveringNotchArea()
     {
         if (_windowHandle == IntPtr.Zero)
         {
@@ -707,24 +930,51 @@ public partial class MainWindow : Window
             return false;
         }
 
-        const int tolerance = 2;
+        var notchLeft = GetWindowLeft(CollapsedWidth) + WindowHorizontalMargin;
+        var notchTop = monitorInfo.Monitor.Top;
+        var notchRight = GetWindowLeft(CollapsedWidth) + CollapsedWidth - WindowHorizontalMargin;
+        var notchBottom = monitorInfo.Monitor.Top + CollapsedHeight;
 
-        return Math.Abs(windowRect.Left - monitorInfo.Monitor.Left) <= tolerance &&
-               Math.Abs(windowRect.Top - monitorInfo.Monitor.Top) <= tolerance &&
-               Math.Abs(windowRect.Right - monitorInfo.Monitor.Right) <= tolerance &&
-               Math.Abs(windowRect.Bottom - monitorInfo.Monitor.Bottom) <= tolerance;
+        var intersectsHorizontally =
+            windowRect.Right > notchLeft &&
+            windowRect.Left < notchRight;
+        var intersectsVertically =
+            windowRect.Bottom > notchTop &&
+            windowRect.Top < notchBottom;
+
+        if (!intersectsHorizontally || !intersectsVertically)
+        {
+            return false;
+        }
+
+        return true;
     }
 
-    private void UpdateOverlayMode(bool overlayModeActive)
+    private void UpdateOverlayMode(bool overlayModeActive, bool immediateTopUpdate = false)
     {
         if (_isOverlayModeActive == overlayModeActive)
         {
+            if (immediateTopUpdate)
+            {
+                ApplyWindowTop(GetWindowTop(overlayModeActive));
+            }
+
             return;
         }
 
         _isOverlayModeActive = overlayModeActive;
         Topmost = overlayModeActive;
-        AnimateWindowDimension(TopProperty, GetWindowTop(overlayModeActive));
+        if (immediateTopUpdate)
+        {
+            ApplyWindowTop(GetWindowTop(overlayModeActive));
+        }
+        else
+        {
+            AnimateWindowDimension(TopProperty, GetWindowTop(overlayModeActive), CollapseAnimationMilliseconds, new CubicEase
+            {
+                EasingMode = EasingMode.EaseOut,
+            });
+        }
 
         if (overlayModeActive)
         {
@@ -762,10 +1012,53 @@ public partial class MainWindow : Window
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
     }
 
+    private void ApplyWindowBounds(double left, double top, double width, double height)
+    {
+        BeginAnimation(TopProperty, null);
+        BeginAnimation(LeftProperty, null);
+        BeginAnimation(WidthProperty, null);
+        BeginAnimation(HeightProperty, null);
+
+        if (_windowHandle != IntPtr.Zero)
+        {
+            SetWindowPos(
+                _windowHandle,
+                IntPtr.Zero,
+                (int)Math.Round(left),
+                (int)Math.Round(top),
+                (int)Math.Round(width),
+                (int)Math.Round(height),
+                SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        }
+
+        SetCurrentValue(LeftProperty, left);
+        SetCurrentValue(TopProperty, top);
+        SetCurrentValue(WidthProperty, width);
+        SetCurrentValue(HeightProperty, height);
+    }
+
+    private void ApplyWindowTop(double top)
+    {
+        BeginAnimation(TopProperty, null);
+
+        if (_windowHandle != IntPtr.Zero)
+        {
+            SetWindowPos(
+                _windowHandle,
+                IntPtr.Zero,
+                (int)Math.Round(Left),
+                (int)Math.Round(top),
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        }
+
+        SetCurrentValue(TopProperty, top);
+    }
+
     private void RecalculateExpandedLayout()
     {
         ExpandedContentViewport.Height = double.NaN;
-        ExpandedContentViewport.Opacity = 1.0;
 
         ExpandedContentRoot.Measure(new Size(ExpandedWidth - 32, double.PositiveInfinity));
         _expandedContentHeight = ExpandedContentRoot.DesiredSize.Height;
@@ -774,11 +1067,19 @@ public partial class MainWindow : Window
         if (_isExpanded)
         {
             ExpandedContentViewport.Height = _expandedContentHeight;
+            ExpandedContentViewport.Opacity = 1.0;
+            ExpandedContentScaleTransform.ScaleX = 1.0;
+            ExpandedContentScaleTransform.ScaleY = 1.0;
+            ExpandedContentTranslateTransform.Y = 0.0;
             Height = _expandedWindowHeight;
         }
         else
         {
             ExpandedContentViewport.Height = 0;
+            ExpandedContentViewport.Opacity = 0.0;
+            ExpandedContentScaleTransform.ScaleX = 0.97;
+            ExpandedContentScaleTransform.ScaleY = 0.9;
+            ExpandedContentTranslateTransform.Y = -6.0;
             Height = CollapsedHeight;
         }
     }
