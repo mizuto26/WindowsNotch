@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -41,6 +42,7 @@ public partial class MainWindow : Window
     private readonly AppSettingsService _settingsService;
     private readonly StartupRegistrationService _startupRegistrationService;
     private readonly ObservableCollection<ShelfItem> _shelfItems = [];
+    private readonly Dictionary<string, int> _animationVersions = [];
 
     private bool _isExpanded;
     private bool _isDragOver;
@@ -178,14 +180,14 @@ public partial class MainWindow : Window
         _isCollapseAnimationActive = false;
         ApplyNotchStateWithoutFade(() =>
         {
-            NotchScaleTransform.ScaleX = GetCollapsedScaleX();
-            NotchScaleTransform.ScaleY = 1.0;
+            ApplyWindowBounds(GetWindowLeft(ExpandedWidth), Top, ExpandedWidth, CollapsedHeight);
             ExpandedContentViewport.Height = 0.0;
             ExpandedContentViewport.Opacity = 0.0;
             ExpandedContentScaleTransform.ScaleX = 0.97;
             ExpandedContentScaleTransform.ScaleY = 0.9;
             ExpandedContentTranslateTransform.Y = -6.0;
-            ApplyWindowBounds(GetWindowLeft(ExpandedWidth), Top, ExpandedWidth, CollapsedHeight);
+            NotchScaleTransform.ScaleX = GetCollapsedScaleX();
+            NotchScaleTransform.ScaleY = 1.0;
             UpdateAnimatedNotchShape();
         });
         UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: false));
@@ -259,11 +261,11 @@ public partial class MainWindow : Window
 
         if (!expanded)
         {
-            ExpandedContentViewport.BeginAnimation(FrameworkElement.HeightProperty, null);
-            ExpandedContentViewport.BeginAnimation(UIElement.OpacityProperty, null);
-            ExpandedContentScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-            ExpandedContentScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-            ExpandedContentTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+            CancelTrackedAnimation(ExpandedContentViewport, FrameworkElement.HeightProperty);
+            CancelTrackedAnimation(ExpandedContentViewport, UIElement.OpacityProperty);
+            CancelTrackedAnimation(ExpandedContentScaleTransform, ScaleTransform.ScaleXProperty);
+            CancelTrackedAnimation(ExpandedContentScaleTransform, ScaleTransform.ScaleYProperty);
+            CancelTrackedAnimation(ExpandedContentTranslateTransform, TranslateTransform.YProperty);
 
             ExpandedContentViewport.Height = 0.0;
             ExpandedContentViewport.Opacity = 0.0;
@@ -304,13 +306,15 @@ public partial class MainWindow : Window
         }
     }
 
-    private static void AnimateElementDimension(
+    private void AnimateElementDimension(
         DependencyObject element,
         DependencyProperty property,
         double targetValue,
         int durationMilliseconds,
         IEasingFunction easingFunction)
     {
+        var animationKey = GetAnimationKey(element, property);
+        var animationVersion = GetNextAnimationVersion(animationKey);
         var animation = new DoubleAnimation
         {
             From = (double)element.GetValue(property),
@@ -322,6 +326,11 @@ public partial class MainWindow : Window
 
         animation.Completed += (_, _) =>
         {
+            if (!IsLatestAnimationVersion(animationKey, animationVersion))
+            {
+                return;
+            }
+
             if (element is IAnimatable animatable)
             {
                 animatable.BeginAnimation(property, null);
@@ -334,6 +343,38 @@ public partial class MainWindow : Window
         {
             animatableElement.BeginAnimation(property, animation, HandoffBehavior.SnapshotAndReplace);
         }
+    }
+
+    private void CancelTrackedAnimation(DependencyObject element, DependencyProperty property)
+    {
+        var animationKey = GetAnimationKey(element, property);
+        GetNextAnimationVersion(animationKey);
+
+        if (element is IAnimatable animatable)
+        {
+            animatable.BeginAnimation(property, null);
+        }
+    }
+
+    private static string GetAnimationKey(DependencyObject element, DependencyProperty property)
+    {
+        return $"{RuntimeHelpers.GetHashCode(element)}:{property.Name}";
+    }
+
+    private int GetNextAnimationVersion(string animationKey)
+    {
+        var nextVersion = _animationVersions.TryGetValue(animationKey, out var currentVersion)
+            ? currentVersion + 1
+            : 1;
+
+        _animationVersions[animationKey] = nextVersion;
+        return nextVersion;
+    }
+
+    private bool IsLatestAnimationVersion(string animationKey, int animationVersion)
+    {
+        return _animationVersions.TryGetValue(animationKey, out var currentVersion) &&
+               currentVersion == animationVersion;
     }
 
     private void UpdateAnimatedNotchShape()
