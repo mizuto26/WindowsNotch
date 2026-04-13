@@ -1,0 +1,7 @@
+# Normalize text files and enforce CRLF for Windows source files
+* text=auto
+*.cs text eol=crlf
+*.xaml text eol=crlf
+*.csproj text eol=crlf
+*.sln text eol=crlf
+*.xaml.cs text eol=crlf
