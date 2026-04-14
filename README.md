@@ -24,8 +24,6 @@ src/WindowsNotch.App
 ├─ App.xaml
 ├─ App.xaml.cs
 ├─ WindowsNotch.App.csproj
-├─ Helpers
-│  └─ WindowSurfaceHelper.cs
 ├─ Models
 │  ├─ AppSettings.cs
 │  └─ ShelfItem.cs
@@ -49,21 +47,6 @@ src/WindowsNotch.App
    ├─ ShareGuideWindow.xaml
    └─ ShareGuideWindow.xaml.cs
 ```
-
-## MainWindow Files
-
-- `MainWindow.xaml.cs`
-  初期化、フィールド、タイマー設定
-- `MainWindow.Animation.cs`
-  ノッチの開閉、アニメーション、ホバー判定
-- `MainWindow.DragAndShelf.cs`
-  ドラッグ&ドロップ、Shelf、プレビュー、キーボード操作
-- `MainWindow.SettingsOverlay.cs`
-  設定画面、オーバーレイ表示、ウィンドウ制御
-- `MainWindow.Interop.cs`
-  Win32 API 呼び出しとカーソル位置取得
-
-## Getting Started
 
 ### Requirements
 
@@ -91,12 +74,6 @@ dotnet run --project .\src\WindowsNotch.App\WindowsNotch.App.csproj
 3. Windows と iPhone で同じ Apple Account にサインインする
 4. ノッチの `iCloud Drive` 側にファイルをドロップする
 5. iPhone の Files アプリで `iCloud Drive > WindowsNotch` を開く
-
-## Notes
-
-- このプロジェクトは実験的な UI 実装を含みます
-- ネイティブ AirDrop 連携ではありません
-- iCloud Drive の同期状況は環境に依存します
 
 ## License
 
