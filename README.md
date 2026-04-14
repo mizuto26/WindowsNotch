@@ -24,8 +24,6 @@ src/WindowsNotch.App
 ├─ App.xaml
 ├─ App.xaml.cs
 ├─ WindowsNotch.App.csproj
-├─ Helpers
-│  └─ WindowSurfaceHelper.cs
 ├─ Models
 │  ├─ AppSettings.cs
 │  └─ ShelfItem.cs
