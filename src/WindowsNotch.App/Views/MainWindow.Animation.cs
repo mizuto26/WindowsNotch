@@ -67,20 +67,17 @@ public partial class MainWindow
         _collapseAnimationTimer.Stop();
         _isCollapseAnimationActive = false;
 
-        ApplyNotchStateWithoutFade(() =>
-        {
-            ApplyWindowBounds(GetWindowLeft(ExpandedWidth), Top, ExpandedWidth, CollapsedHeight);
-            ExpandedContentViewport.Height = 0.0;
-            ExpandedContentViewport.Opacity = 0.0;
-            ExpandedContentScaleTransform.ScaleX = 0.97;
-            ExpandedContentScaleTransform.ScaleY = 0.9;
-            ExpandedContentTranslateTransform.Y = -6.0;
-            NotchScaleTransform.ScaleX = GetCollapsedScaleX();
-            NotchScaleTransform.ScaleY = 1.0;
-            UpdateAnimatedNotchShape();
-        });
+        var overlayModeActive = ShouldDisplayOverlay(isInteractive: false);
+        var collapsedTop = GetWindowTop(overlayModeActive);
 
-        UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: false));
+        ApplyWindowBounds(GetWindowLeft(ExpandedWidth), collapsedTop, ExpandedWidth, CollapsedHeight);
+        NotchBody.Opacity = 1.0;
+        NotchScaleTransform.ScaleX = GetCollapsedScaleX();
+        NotchScaleTransform.ScaleY = 1.0;
+        UpdateLayout();
+        UpdateAnimatedNotchShape();
+
+        UpdateOverlayMode(overlayModeActive, immediateTopUpdate: true);
     }
 
     private bool IsCursorInHotZone(Point cursorPoint)
@@ -276,19 +273,8 @@ public partial class MainWindow
         NotchBody.Clip = CreateNotchClipGeometry(NotchBody.ActualWidth, NotchBody.ActualHeight, radiusX, radiusY);
     }
 
-    private void ApplyNotchStateWithoutFade(Action updateAction)
-    {
-        updateAction();
-        Dispatcher.BeginInvoke(() =>
-        {
-            UpdateLayout();
-            UpdateAnimatedNotchShape();
-        }, DispatcherPriority.Render);
-    }
-
     private void ApplyExpandedWindowState(Action updateAction)
     {
-        NotchBody.Opacity = 0.0;
         updateAction();
         Dispatcher.BeginInvoke(() =>
         {
@@ -296,7 +282,6 @@ public partial class MainWindow
             NotchScaleTransform.ScaleX = GetCollapsedScaleX();
             NotchScaleTransform.ScaleY = GetCollapsedScaleY();
             UpdateAnimatedNotchShape();
-            NotchBody.Opacity = 1.0;
             SettingsButton.Visibility = Visibility.Visible;
         }, DispatcherPriority.Render);
     }
