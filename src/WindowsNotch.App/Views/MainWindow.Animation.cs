@@ -18,7 +18,7 @@ public partial class MainWindow
             IsCursorInHotZone(cursorPoint))
         {
             _lastInteractiveUtc = DateTime.UtcNow;
-            UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: true));
+            RefreshOverlayMode(isInteractive: true);
             SetExpanded(true);
         }
 
@@ -29,7 +29,7 @@ public partial class MainWindow
             IsCursorInHotZone(cursorPoint) ||
             (!_isCollapseAnimationActive && IsCursorOverNotchBody(cursorPoint));
 
-        UpdateOverlayMode(ShouldDisplayOverlay(isInteractive));
+        RefreshOverlayMode(isInteractive);
 
         if (isInteractive)
         {
@@ -71,7 +71,6 @@ public partial class MainWindow
         var collapsedTop = GetWindowTop(overlayModeActive);
 
         ApplyWindowBounds(GetWindowLeft(ExpandedWidth), collapsedTop, ExpandedWidth, CollapsedHeight);
-        NotchBody.Opacity = 1.0;
         NotchScaleTransform.ScaleX = GetCollapsedScaleX();
         NotchScaleTransform.ScaleY = 1.0;
         UpdateLayout();
@@ -118,7 +117,7 @@ public partial class MainWindow
             SettingsButton.Visibility = Visibility.Collapsed;
             ExpandedContentViewport.Opacity = 0.0;
             _collapseAnimationTimer.Stop();
-            ApplyExpandedWindowState(() =>
+            PrepareExpandedWindowForAnimation(() =>
             {
                 ApplyWindowBounds(Left, GetWindowTop(overlayModeActive: true), ExpandedWidth, _expandedWindowHeight);
                 ExpandedContentViewport.Height = _expandedContentHeight;
@@ -142,8 +141,8 @@ public partial class MainWindow
         var targetScaleY = expanded ? 1.0 : 0.9;
         var targetTranslateY = expanded ? 0.0 : -6.0;
 
-        UpdateOverlayMode(
-            ShouldDisplayOverlay(expanded || _isDragOver || _isShareDropTargetActive || _isShelfDropTargetActive),
+        RefreshOverlayMode(
+            isInteractive: expanded || _isDragOver || _isShareDropTargetActive || _isShelfDropTargetActive,
             immediateTopUpdate: expanded);
 
         if (!expanded)
@@ -273,7 +272,7 @@ public partial class MainWindow
         NotchBody.Clip = CreateNotchClipGeometry(NotchBody.ActualWidth, NotchBody.ActualHeight, radiusX, radiusY);
     }
 
-    private void ApplyExpandedWindowState(Action updateAction)
+    private void PrepareExpandedWindowForAnimation(Action updateAction)
     {
         updateAction();
         Dispatcher.BeginInvoke(() =>
@@ -373,7 +372,7 @@ public partial class MainWindow
         Top = GetWindowTop(overlayModeActive: ShouldDisplayOverlay(isInteractive: false));
         SettingsButton.Visibility = Visibility.Collapsed;
         UpdateAnimatedNotchShape();
-        UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: false));
+        RefreshOverlayModeForCurrentState();
     }
 
     private static double GetWindowLeft(double width)

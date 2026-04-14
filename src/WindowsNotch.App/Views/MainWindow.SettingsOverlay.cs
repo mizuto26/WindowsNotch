@@ -13,7 +13,7 @@ public partial class MainWindow
 
         var wasHoverTimerRunning = _hoverTimer.IsEnabled;
         _hoverTimer.Stop();
-        UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: true));
+        RefreshOverlayMode(isInteractive: true);
 
         try
         {
@@ -67,7 +67,17 @@ public partial class MainWindow
 
     private void ApplyWindowModeSettings()
     {
-        UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: false));
+        RefreshOverlayModeForCurrentState();
+    }
+
+    private void RefreshOverlayModeForCurrentState(bool immediateTopUpdate = false)
+    {
+        RefreshOverlayMode(isInteractive: false, immediateTopUpdate);
+    }
+
+    private void RefreshOverlayMode(bool isInteractive, bool immediateTopUpdate = false)
+    {
+        UpdateOverlayMode(ShouldDisplayOverlay(isInteractive), immediateTopUpdate);
     }
 
     private bool ShouldDisplayOverlay(bool isInteractive)

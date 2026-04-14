@@ -27,7 +27,7 @@ public partial class MainWindow
         _isShareDropTargetActive = false;
         _isShelfDropTargetActive = false;
         UpdateDropZoneVisuals();
-        UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: false));
+        RefreshOverlayModeForCurrentState();
         _lastInteractiveUtc = DateTime.UtcNow;
         e.Handled = true;
     }
@@ -42,7 +42,7 @@ public partial class MainWindow
         if (hasFileDrop)
         {
             _lastInteractiveUtc = DateTime.UtcNow;
-            UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: true));
+            RefreshOverlayMode(isInteractive: true);
             SetExpanded(true);
         }
     }
@@ -61,7 +61,7 @@ public partial class MainWindow
     {
         _isShareDropTargetActive = false;
         UpdateDropZoneVisuals();
-        UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: false));
+        RefreshOverlayModeForCurrentState();
         e.Handled = true;
     }
 
@@ -71,7 +71,7 @@ public partial class MainWindow
         _isDragOver = false;
         _lastInteractiveUtc = DateTime.UtcNow;
         UpdateDropZoneVisuals();
-        UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: true));
+        RefreshOverlayMode(isInteractive: true);
         e.Handled = true;
 
         if (e.Data.GetData(DataFormats.FileDrop) is not string[] entries || entries.Length == 0)
@@ -107,7 +107,7 @@ public partial class MainWindow
     {
         _isShelfDropTargetActive = false;
         UpdateDropZoneVisuals();
-        UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: false));
+        RefreshOverlayModeForCurrentState();
         e.Handled = true;
     }
 
@@ -117,7 +117,7 @@ public partial class MainWindow
         _isDragOver = false;
         _lastInteractiveUtc = DateTime.UtcNow;
         UpdateDropZoneVisuals();
-        UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: true));
+        RefreshOverlayMode(isInteractive: true);
         e.Handled = true;
 
         if (e.Data.GetData(DataFormats.FileDrop) is not string[] entries || entries.Length == 0)
@@ -149,7 +149,7 @@ public partial class MainWindow
         if (hasFileDrop)
         {
             _lastInteractiveUtc = DateTime.UtcNow;
-            UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: true));
+            RefreshOverlayMode(isInteractive: true);
             SetExpanded(true);
         }
 
@@ -204,7 +204,7 @@ public partial class MainWindow
         {
             _isShelfItemDragActive = false;
             HideDragPreview();
-            UpdateOverlayMode(ShouldDisplayOverlay(isInteractive: false), immediateTopUpdate: true);
+            RefreshOverlayModeForCurrentState(immediateTopUpdate: true);
         }
     }
 
