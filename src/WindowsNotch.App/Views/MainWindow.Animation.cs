@@ -67,14 +67,12 @@ public partial class MainWindow
         _collapseAnimationTimer.Stop();
         _isCollapseAnimationActive = false;
 
-        var overlayModeActive = ShouldDisplayOverlay(isInteractive: false);
+        var overlayModeActive = _pendingCollapseOverlayModeActive ?? ShouldDisplayOverlayAfterCollapse();
+        _pendingCollapseOverlayModeActive = null;
         var collapsedTop = GetWindowTop(overlayModeActive);
 
         ApplyWindowBounds(GetWindowLeft(ExpandedWidth), collapsedTop, ExpandedWidth, CollapsedHeight);
-        NotchScaleTransform.ScaleX = GetCollapsedScaleX();
-        NotchScaleTransform.ScaleY = 1.0;
-        UpdateLayout();
-        UpdateAnimatedNotchShape();
+        ApplyRestingCollapsedNotchVisualState();
 
         UpdateOverlayMode(overlayModeActive, immediateTopUpdate: true);
     }
@@ -114,6 +112,7 @@ public partial class MainWindow
 
         if (expanded)
         {
+            _pendingCollapseOverlayModeActive = null;
             SettingsButton.Visibility = Visibility.Collapsed;
             ExpandedContentViewport.Opacity = 0.0;
             _collapseAnimationTimer.Stop();
@@ -130,6 +129,16 @@ public partial class MainWindow
         {
             SettingsButton.Visibility = Visibility.Collapsed;
             _collapseAnimationTimer.Stop();
+            _pendingCollapseOverlayModeActive = ShouldDisplayOverlayAfterCollapse();
+
+            if (_pendingCollapseOverlayModeActive == false)
+            {
+                AnimateWindowDimension(TopProperty, GetWindowTop(overlayModeActive: false), CollapseAnimationMilliseconds, new CubicEase
+                {
+                    EasingMode = EasingMode.EaseOut,
+                });
+            }
+
             _collapseAnimationTimer.Start();
         }
 
@@ -277,12 +286,25 @@ public partial class MainWindow
         updateAction();
         Dispatcher.BeginInvoke(() =>
         {
-            UpdateLayout();
-            NotchScaleTransform.ScaleX = GetCollapsedScaleX();
-            NotchScaleTransform.ScaleY = GetCollapsedScaleY();
-            UpdateAnimatedNotchShape();
+            ApplyAnimatedCollapsedNotchVisualState();
             SettingsButton.Visibility = Visibility.Visible;
         }, DispatcherPriority.Render);
+    }
+
+    private void ApplyRestingCollapsedNotchVisualState()
+    {
+        UpdateLayout();
+        NotchScaleTransform.ScaleX = GetCollapsedScaleX();
+        NotchScaleTransform.ScaleY = 1.0;
+        UpdateAnimatedNotchShape();
+    }
+
+    private void ApplyAnimatedCollapsedNotchVisualState()
+    {
+        UpdateLayout();
+        NotchScaleTransform.ScaleX = GetCollapsedScaleX();
+        NotchScaleTransform.ScaleY = GetCollapsedScaleY();
+        UpdateAnimatedNotchShape();
     }
 
     private void AnimateWindowDimension(

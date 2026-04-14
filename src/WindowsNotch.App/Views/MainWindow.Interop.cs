@@ -43,6 +43,13 @@ public partial class MainWindow
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetWindowRect(IntPtr hWnd, out NativeRect lpRect);
 
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(
+        IntPtr hwnd,
+        int dwAttribute,
+        out NativeRect pvAttribute,
+        int cbAttribute);
+
     [DllImport("user32.dll")]
     private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
 
@@ -68,6 +75,7 @@ public partial class MainWindow
     private const uint SWP_NOMOVE = 0x0002;
     private const uint SWP_NOACTIVATE = 0x0010;
     private const uint SWP_SHOWWINDOW = 0x0040;
+    private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint
@@ -92,5 +100,19 @@ public partial class MainWindow
         public NativeRect Monitor;
         public NativeRect WorkArea;
         public uint Flags;
+    }
+
+    private static bool TryGetVisibleWindowRect(IntPtr windowHandle, out NativeRect windowRect)
+    {
+        if (DwmGetWindowAttribute(
+                windowHandle,
+                DWMWA_EXTENDED_FRAME_BOUNDS,
+                out windowRect,
+                Marshal.SizeOf<NativeRect>()) == 0)
+        {
+            return true;
+        }
+
+        return GetWindowRect(windowHandle, out windowRect);
     }
 }

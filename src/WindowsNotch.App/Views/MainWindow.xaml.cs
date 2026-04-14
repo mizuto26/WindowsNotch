@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     private const int CollapseAnimationMilliseconds = 240;
     private const int HoverPollMilliseconds = 16;
     private const int CollapseDelayMilliseconds = 180;
+    private const int OverlayHideDelayMilliseconds = 140;
     private const int TopmostRefreshMilliseconds = 500;
 
     private readonly DispatcherTimer _hoverTimer;
@@ -44,6 +45,8 @@ public partial class MainWindow : Window
     private bool _isShelfDropTargetActive;
     private bool _isOverlayModeActive;
     private bool _isShelfItemDragActive;
+    private DateTime? _notchCoveredSinceUtc;
+    private bool? _pendingCollapseOverlayModeActive;
     private DateTime _lastInteractiveUtc = DateTime.UtcNow;
     private IntPtr _windowHandle = IntPtr.Zero;
     private double _expandedContentHeight;
@@ -93,8 +96,7 @@ public partial class MainWindow : Window
     {
         Width = ExpandedWidth;
         Height = CollapsedHeight;
-        NotchScaleTransform.ScaleX = GetCollapsedScaleX();
-        NotchScaleTransform.ScaleY = 1.0;
+        ApplyRestingCollapsedNotchVisualState();
 
         ApplyWindowModeSettings();
         LoadShelfItems();

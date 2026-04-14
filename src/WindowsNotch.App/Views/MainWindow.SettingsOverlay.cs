@@ -84,13 +84,42 @@ public partial class MainWindow
     {
         if (_isShelfItemDragActive)
         {
+            _notchCoveredSinceUtc = null;
             return false;
         }
+
+        var isCovered = IsOtherWindowCoveringNotchArea();
 
         return isInteractive ||
                _isExpanded ||
                _isCollapseAnimationActive ||
+               !IsNotchCoveredLongEnough(isCovered);
+    }
+
+    private bool ShouldDisplayOverlayAfterCollapse()
+    {
+        if (_isShelfItemDragActive)
+        {
+            _notchCoveredSinceUtc = null;
+            return false;
+        }
+
+        return _isDragOver ||
+               _isShareDropTargetActive ||
+               _isShelfDropTargetActive ||
                !IsOtherWindowCoveringNotchArea();
+    }
+
+    private bool IsNotchCoveredLongEnough(bool isCovered)
+    {
+        if (!isCovered)
+        {
+            _notchCoveredSinceUtc = null;
+            return false;
+        }
+
+        _notchCoveredSinceUtc ??= DateTime.UtcNow;
+        return DateTime.UtcNow - _notchCoveredSinceUtc.Value >= TimeSpan.FromMilliseconds(OverlayHideDelayMilliseconds);
     }
 
     private bool IsOtherWindowCoveringNotchArea()
@@ -111,12 +140,12 @@ public partial class MainWindow
             return false;
         }
 
-        if (!GetWindowRect(foregroundWindowHandle, out var windowRect))
+        if (!TryGetVisibleWindowRect(foregroundWindowHandle, out var windowRect))
         {
             return false;
         }
 
-        var monitorHandle = MonitorFromWindow(foregroundWindowHandle, MONITOR_DEFAULTTONEAREST);
+        var monitorHandle = MonitorFromWindow(_windowHandle, MONITOR_DEFAULTTONEAREST);
         if (monitorHandle == IntPtr.Zero)
         {
             return false;
@@ -136,15 +165,15 @@ public partial class MainWindow
         var notchTop = monitorInfo.Monitor.Top;
         var notchRight = GetWindowLeft(CollapsedWidth) + CollapsedWidth - WindowHorizontalMargin;
         var notchBottom = monitorInfo.Monitor.Top + CollapsedHeight;
+        const int overlapThreshold = 6;
 
-        var intersectsHorizontally =
-            windowRect.Right > notchLeft &&
-            windowRect.Left < notchRight;
-        var intersectsVertically =
-            windowRect.Bottom > notchTop &&
-            windowRect.Top < notchBottom;
+        var horizontalOverlap = Math.Min(windowRect.Right, (int)Math.Round(notchRight)) -
+                                Math.Max(windowRect.Left, (int)Math.Round(notchLeft));
+        var verticalOverlap = Math.Min(windowRect.Bottom, (int)Math.Round(notchBottom)) -
+                              Math.Max(windowRect.Top, notchTop);
 
-        return intersectsHorizontally && intersectsVertically;
+        return horizontalOverlap >= overlapThreshold &&
+               verticalOverlap >= overlapThreshold;
     }
 
     private void UpdateOverlayMode(bool overlayModeActive, bool immediateTopUpdate = false)
@@ -162,16 +191,16 @@ public partial class MainWindow
         _isOverlayModeActive = overlayModeActive;
         Topmost = overlayModeActive;
 
-        if (immediateTopUpdate)
+        if (!overlayModeActive && !immediateTopUpdate)
         {
-            ApplyWindowTop(GetWindowTop(overlayModeActive));
-        }
-        else
-        {
-            AnimateWindowDimension(TopProperty, GetWindowTop(overlayModeActive), CollapseAnimationMilliseconds, new CubicEase
+            AnimateWindowDimension(TopProperty, GetWindowTop(overlayModeActive: false), CollapseAnimationMilliseconds, new CubicEase
             {
                 EasingMode = EasingMode.EaseOut,
             });
+        }
+        else
+        {
+            ApplyWindowTop(GetWindowTop(overlayModeActive));
         }
 
         if (overlayModeActive)
