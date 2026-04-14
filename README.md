@@ -1,79 +1,29 @@
 # WindowsNotch
 
-Windows 上で mac 風のノッチ UI を再現する WPF アプリです。  
-画面上部に常駐するノッチから、ファイルの一時保管と iCloud Drive への共有を行えます。
+Windows で mac 風のノッチ UI を再現するデスクトップアプリです。  
+画面上部のノッチから、ファイルの一時保管と iCloud Drive への共有ができます。
 
-## Features
 
-- mac ライクなノッチ UI
-- ホバーで開閉する上部ノッチ
-- ファイルの一時保管 Shelf
-- iCloud Drive 共有フォルダへの送信
-- 設定画面と iPhone 共有手順ガイド
+## 使い方
 
-## Tech Stack
+1. GitHub の Releases から `WindowsNotch-win-x64.zip` をダウンロードします
+2. zip を展開します
+3. 展開したフォルダの `WindowsNotch.App.exe` を実行します
+4. 画面上部中央にカーソルを合わせるとノッチが開きます
 
-- .NET 8
-- WPF
-- Windows 10/11
+## iPhone に送る方法
 
-## Project Structure
+現在の共有はネイティブ AirDrop ではなく、`iCloud Drive\WindowsNotch` フォルダ経由です。
 
-```text
-src/WindowsNotch.App
-├─ App.xaml
-├─ App.xaml.cs
-├─ WindowsNotch.App.csproj
-├─ Models
-│  ├─ AppSettings.cs
-│  └─ ShelfItem.cs
-├─ Services
-│  ├─ AppSettingsService.cs
-│  ├─ CopyResult.cs
-│  ├─ FileDropService.cs
-│  ├─ ICloudDriveLocator.cs
-│  ├─ ShelfService.cs
-│  ├─ StartupRegistrationService.cs
-│  └─ StorageCopyHelper.cs
-└─ Views
-   ├─ MainWindow.xaml
-   ├─ MainWindow.xaml.cs
-   ├─ MainWindow.Animation.cs
-   ├─ MainWindow.DragAndShelf.cs
-   ├─ MainWindow.Interop.cs
-   ├─ MainWindow.SettingsOverlay.cs
-   ├─ SettingsWindow.xaml
-   ├─ SettingsWindow.xaml.cs
-   ├─ ShareGuideWindow.xaml
-   └─ ShareGuideWindow.xaml.cs
-```
+1. Windows に iCloud for Windows をインストールします
+2. iCloud Drive を有効にします
+3. Windows と iPhone の両方で同じ Apple Account にサインインします
+4. ノッチの `iCloud Drive` エリアにファイルをドロップします
+5. iPhone の Files アプリで `iCloud Drive > WindowsNotch` を開きます
 
-### Requirements
+## 対応環境
 
-- .NET 8 SDK
-- Windows
-
-### Build
-
-```powershell
-dotnet build .\WindowsNotch.sln
-```
-
-### Run
-
-```powershell
-dotnet run --project .\src\WindowsNotch.App\WindowsNotch.App.csproj
-```
-
-## Sharing to iPhone
-
-現在の共有方法はネイティブ AirDrop ではなく、`iCloud Drive\WindowsNotch` フォルダ経由です。
-
-1. Windows に iCloud for Windows をインストールする
-2. iCloud Drive を有効にする
-3. Windows と iPhone で同じ Apple Account にサインインする
-4. ノッチの `iCloud Drive` 側にファイルをドロップする
-5. iPhone の Files アプリで `iCloud Drive > WindowsNotch` を開く
+- Windows 10 / 11 x64
 
 ## License
 
