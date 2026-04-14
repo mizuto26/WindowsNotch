@@ -6,26 +6,16 @@ namespace WindowsNotch.App.Services;
 
 public sealed class AppSettingsService
 {
-    private readonly string _settingsPath;
-
-    public AppSettingsService()
-    {
-        _settingsPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "WindowsNotch",
-            "settings.json");
-    }
-
     public AppSettings Load()
     {
         try
         {
-            if (!File.Exists(_settingsPath))
+            if (!File.Exists(AppPaths.SettingsFilePath))
             {
                 return new AppSettings();
             }
 
-            var json = File.ReadAllText(_settingsPath);
+            var json = File.ReadAllText(AppPaths.SettingsFilePath);
             return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
         }
         catch
@@ -36,7 +26,7 @@ public sealed class AppSettingsService
 
     public void Save(AppSettings settings)
     {
-        var settingsDirectory = Path.GetDirectoryName(_settingsPath)
+        var settingsDirectory = Path.GetDirectoryName(AppPaths.SettingsFilePath)
             ?? throw new InvalidOperationException("Settings directory could not be resolved.");
 
         Directory.CreateDirectory(settingsDirectory);
@@ -48,6 +38,6 @@ public sealed class AppSettingsService
                 WriteIndented = true,
             });
 
-        File.WriteAllText(_settingsPath, json);
+        File.WriteAllText(AppPaths.SettingsFilePath, json);
     }
 }

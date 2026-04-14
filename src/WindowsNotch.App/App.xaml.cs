@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using WindowsNotch.App.Services;
 
 namespace WindowsNotch.App;
 
@@ -40,14 +41,9 @@ public partial class App : Application
 
     private static string WriteCrashLog(Exception exception)
     {
-        var logDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "WindowsNotch",
-            "logs");
+        Directory.CreateDirectory(AppPaths.LogRoot);
 
-        Directory.CreateDirectory(logDirectory);
-
-        var logPath = Path.Combine(logDirectory, $"crash-{DateTime.Now:yyyyMMdd-HHmmss}.log");
+        var logPath = Path.Combine(AppPaths.LogRoot, $"crash-{DateTime.Now:yyyyMMdd-HHmmss}.log");
         var logText =
             $"Timestamp: {DateTime.Now:O}{Environment.NewLine}" +
             $"OS: {Environment.OSVersion}{Environment.NewLine}" +

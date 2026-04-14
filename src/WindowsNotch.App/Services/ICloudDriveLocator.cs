@@ -4,6 +4,8 @@ namespace WindowsNotch.App.Services;
 
 public sealed class ICloudDriveLocator
 {
+    public const string WindowsNotchFolderName = "WindowsNotch";
+
     private static readonly string[] CandidateFolderNames =
     [
         "iCloudDrive",
@@ -36,7 +38,7 @@ public sealed class ICloudDriveLocator
             return false;
         }
 
-        folderPath = Path.Combine(rootPath, "WindowsNotch");
+        folderPath = Path.Combine(rootPath, WindowsNotchFolderName);
         return true;
     }
 }

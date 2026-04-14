@@ -8,24 +8,28 @@ namespace WindowsNotch.App.Services;
 
 public sealed class ShelfService
 {
+    private static readonly HashSet<string> SupportedThumbnailExtensions =
+    [
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".bmp",
+        ".gif",
+    ];
+
     private readonly ICloudDriveLocator _iCloudDriveLocator;
-    private readonly string _shelfRoot;
 
     public ShelfService(ICloudDriveLocator iCloudDriveLocator)
     {
         _iCloudDriveLocator = iCloudDriveLocator;
-        _shelfRoot = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "WindowsNotch",
-            "Shelf");
     }
 
     public IReadOnlyList<ShelfItem> LoadItems()
     {
-        Directory.CreateDirectory(_shelfRoot);
+        Directory.CreateDirectory(AppPaths.ShelfRoot);
 
         return Directory
-            .EnumerateFileSystemEntries(_shelfRoot)
+            .EnumerateFileSystemEntries(AppPaths.ShelfRoot)
             .Select(CreateShelfItem)
             .OrderByDescending(item => item.AddedAtUtc)
             .ToList();
@@ -35,7 +39,7 @@ public sealed class ShelfService
     {
         return Task.Run<IReadOnlyList<ShelfItem>>(() =>
         {
-            Directory.CreateDirectory(_shelfRoot);
+            Directory.CreateDirectory(AppPaths.ShelfRoot);
 
             foreach (var entryPath in entryPaths)
             {
@@ -46,36 +50,10 @@ public sealed class ShelfService
                     continue;
                 }
 
-                StorageCopyHelper.CopyEntryToUniqueDestination(entryPath, _shelfRoot);
+                StorageCopyHelper.CopyEntryToUniqueDestination(entryPath, AppPaths.ShelfRoot);
             }
 
             return LoadItems();
-        }, cancellationToken);
-    }
-
-    public Task<CopyResult> SendToICloudAsync(ShelfItem item, CancellationToken cancellationToken = default)
-    {
-        return Task.Run(() =>
-        {
-            if (!_iCloudDriveLocator.TryResolveWindowsNotchFolder(out var destinationFolder))
-            {
-                return new CopyResult(
-                    false,
-                    "iCloud Drive was not found. Turn it on in iCloud for Windows first.",
-                    null,
-                    0);
-            }
-
-            Directory.CreateDirectory(destinationFolder);
-            cancellationToken.ThrowIfCancellationRequested();
-
-            StorageCopyHelper.CopyEntryToUniqueDestination(item.StoredPath, destinationFolder);
-
-            return new CopyResult(
-                true,
-                "Sent to iCloud Drive.",
-                destinationFolder,
-                1);
         }, cancellationToken);
     }
 
@@ -135,20 +113,6 @@ public sealed class ShelfService
         return LoadItems();
     }
 
-    public void OpenItem(ShelfItem item)
-    {
-        if (!File.Exists(item.StoredPath) && !Directory.Exists(item.StoredPath))
-        {
-            return;
-        }
-
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = item.StoredPath,
-            UseShellExecute = true,
-        });
-    }
-
     private static ShelfItem CreateShelfItem(string path)
     {
         var isDirectory = Directory.Exists(path);
@@ -174,7 +138,7 @@ public sealed class ShelfService
         }
 
         var extension = Path.GetExtension(path).ToLowerInvariant();
-        if (extension is not ".png" and not ".jpg" and not ".jpeg" and not ".bmp" and not ".gif")
+        if (!SupportedThumbnailExtensions.Contains(extension))
         {
             return null;
         }
