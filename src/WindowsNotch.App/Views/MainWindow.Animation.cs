@@ -73,6 +73,7 @@ public partial class MainWindow
 
         ApplyWindowBounds(GetWindowLeft(ExpandedWidth), collapsedTop, ExpandedWidth, CollapsedHeight);
         ApplyRestingCollapsedNotchVisualState();
+        UpdateExpandedModePresentation();
 
         UpdateOverlayMode(overlayModeActive, immediateTopUpdate: true);
     }
@@ -115,6 +116,7 @@ public partial class MainWindow
             _pendingCollapseOverlayModeActive = null;
             SettingsButton.Visibility = Visibility.Collapsed;
             ExpandedContentViewport.Opacity = 0.0;
+            UpdateExpandedModePresentation();
             _collapseAnimationTimer.Stop();
             PrepareExpandedWindowForAnimation(() =>
             {
@@ -128,6 +130,7 @@ public partial class MainWindow
         else
         {
             SettingsButton.Visibility = Visibility.Collapsed;
+            UpdateExpandedModePresentation();
             _collapseAnimationTimer.Stop();
             _pendingCollapseOverlayModeActive = ShouldDisplayOverlayAfterCollapse();
 
@@ -288,6 +291,7 @@ public partial class MainWindow
         {
             ApplyAnimatedCollapsedNotchVisualState();
             SettingsButton.Visibility = Visibility.Visible;
+            UpdateExpandedModePresentation();
         }, DispatcherPriority.Render);
     }
 

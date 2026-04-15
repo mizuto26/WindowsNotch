@@ -3,23 +3,17 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              StartupUri="Views/MainWindow.xaml">
     <Application.Resources>
-        <LinearGradientBrush x:Key="NotchBackgroundBrush"
-                             StartPoint="0,0"
-                             EndPoint="0,1">
-            <GradientStop Color="#F61C1C20"
-                          Offset="0" />
-            <GradientStop Color="#F60F0F12"
-                          Offset="1" />
-        </LinearGradientBrush>
-        <SolidColorBrush x:Key="NotchBorderBrush" Color="#30FFFFFF" />
-        <SolidColorBrush x:Key="PanelBrush" Color="#14161A" />
-        <SolidColorBrush x:Key="PanelBorderBrush" Color="#20FFFFFF" />
-        <SolidColorBrush x:Key="PanelInnerBrush" Color="#0DFFFFFF" />
-        <SolidColorBrush x:Key="PanelInnerBorderBrush" Color="#18FFFFFF" />
+        <SolidColorBrush x:Key="NotchBackgroundBrush" Color="#FF000000" />
+        <SolidColorBrush x:Key="NotchBorderBrush" Color="#00000000" />
+        <SolidColorBrush x:Key="PanelBrush" Color="#0A0A0B" />
+        <SolidColorBrush x:Key="PanelBorderBrush" Color="#00000000" />
+        <SolidColorBrush x:Key="PanelInnerBrush" Color="#00000000" />
+        <SolidColorBrush x:Key="PanelInnerBorderBrush" Color="#00000000" />
         <SolidColorBrush x:Key="AccentBrush" Color="#7CB8FF" />
         <SolidColorBrush x:Key="AccentFillBrush" Color="#305A9CFF" />
         <SolidColorBrush x:Key="SubtleBrush" Color="#E8F5F5F7" />
         <SolidColorBrush x:Key="MutedBrush" Color="#8AF5F5F7" />
+        <SolidColorBrush x:Key="ForegroundBrush" Color="#E8F5F5F7" />
 
         <Style x:Key="TrafficLightButtonStyle"
                TargetType="Button">
@@ -257,6 +251,253 @@
                     Value="#18FFFFFF" />
             <Setter Property="BorderThickness"
                     Value="1" />
+        </Style>
+
+        <Style x:Key="MusicTransportButtonStyle"
+               TargetType="Button">
+            <Setter Property="Width"
+                    Value="36" />
+            <Setter Property="Height"
+                    Value="36" />
+            <Setter Property="Padding"
+                    Value="0" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="Background"
+                    Value="#12FFFFFF" />
+            <Setter Property="BorderBrush"
+                    Value="#1CFFFFFF" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="18">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="Chrome"
+                                        Property="Opacity"
+                                        Value="0.92" />
+                            </Trigger>
+                            <Trigger Property="IsPressed"
+                                     Value="True">
+                                <Setter TargetName="Chrome"
+                                        Property="Opacity"
+                                        Value="0.82" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled"
+                                     Value="False">
+                                <Setter TargetName="Chrome"
+                                        Property="Opacity"
+                                        Value="0.42" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryMusicTransportButtonStyle"
+               BasedOn="{StaticResource MusicTransportButtonStyle}"
+               TargetType="Button">
+            <Setter Property="Width"
+                    Value="44" />
+            <Setter Property="Height"
+                    Value="44" />
+            <Setter Property="Background"
+                    Value="#FFF5F6F8" />
+            <Setter Property="BorderBrush"
+                    Value="#12FFFFFF" />
+            <Setter Property="Foreground"
+                    Value="#FF111216" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="22">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="Chrome"
+                                        Property="Opacity"
+                                        Value="0.94" />
+                            </Trigger>
+                            <Trigger Property="IsPressed"
+                                     Value="True">
+                                <Setter TargetName="Chrome"
+                                        Property="Opacity"
+                                        Value="0.86" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled"
+                                     Value="False">
+                                <Setter TargetName="Chrome"
+                                        Property="Opacity"
+                                        Value="0.42" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="FlatMusicTransportButtonStyle"
+               TargetType="Button">
+            <Setter Property="Width"
+                    Value="44" />
+            <Setter Property="Height"
+                    Value="44" />
+            <Setter Property="Padding"
+                    Value="0" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="Background"
+                    Value="Transparent" />
+            <Setter Property="BorderBrush"
+                    Value="Transparent" />
+            <Setter Property="BorderThickness"
+                    Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="Transparent"
+                                CornerRadius="22">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="Chrome"
+                                        Property="Background"
+                                        Value="#14FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed"
+                                     Value="True">
+                                <Setter TargetName="Chrome"
+                                        Property="Background"
+                                        Value="#1FFFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled"
+                                     Value="False">
+                                <Setter TargetName="Chrome"
+                                        Property="Opacity"
+                                        Value="0.42" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="MusicProgressSliderStyle"
+               TargetType="Slider">
+            <Setter Property="Foreground"
+                    Value="{StaticResource AccentBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid Height="16">
+                            <Border Height="4"
+                                    VerticalAlignment="Center"
+                                    Background="#18FFFFFF"
+                                    CornerRadius="2" />
+                            <Track x:Name="PART_Track"
+                                   VerticalAlignment="Center">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge"
+                                                  Focusable="False"
+                                                  BorderThickness="0"
+                                                  Background="Transparent">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="4"
+                                                        VerticalAlignment="Center"
+                                                        Background="{TemplateBinding Foreground}"
+                                                        CornerRadius="2" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge"
+                                                  Focusable="False"
+                                                  BorderThickness="0"
+                                                  Background="Transparent">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Rectangle Height="4"
+                                                           VerticalAlignment="Center"
+                                                           Fill="Transparent" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="10"
+                                           Height="10"
+                                           Background="#FFF5F6F8"
+                                           BorderBrush="#20FFFFFF"
+                                           BorderThickness="1">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border Background="{TemplateBinding Background}"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                        CornerRadius="5" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="NotchTopIconButtonStyle"
+               TargetType="Button">
+            <Setter Property="Width"
+                    Value="34" />
+            <Setter Property="Height"
+                    Value="30" />
+            <Setter Property="Padding"
+                    Value="0" />
+            <Setter Property="Background"
+                    Value="Transparent" />
+            <Setter Property="BorderBrush"
+                    Value="Transparent" />
+            <Setter Property="BorderThickness"
+                    Value="0" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="Focusable"
+                    Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Application.Resources>
 </Application>

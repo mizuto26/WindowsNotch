@@ -16,7 +16,7 @@
         SizeChanged="Window_SizeChanged"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
     <Border x:Name="WindowSurfaceBorder"
-            Margin="12"
+            Margin="0"
             Background="{StaticResource NotchBackgroundBrush}"
             BorderBrush="Transparent"
             BorderThickness="0"

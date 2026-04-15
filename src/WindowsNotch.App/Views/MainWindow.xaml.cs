@@ -9,6 +9,12 @@ namespace WindowsNotch.App;
 
 public partial class MainWindow : Window
 {
+    private enum ExpandedMode
+    {
+        Files,
+        Music,
+    }
+
     private const double WindowHorizontalMargin = 6;
     private const double WindowBottomMargin = 10;
     private const double VisualBottomCornerRadius = 32;
@@ -35,6 +41,7 @@ public partial class MainWindow : Window
     private readonly ShelfService _shelfService;
     private readonly AppSettingsService _settingsService;
     private readonly StartupRegistrationService _startupRegistrationService;
+    private readonly MediaSessionService _mediaSessionService;
     private readonly ObservableCollection<ShelfItem> _shelfItems = [];
     private readonly Dictionary<string, int> _animationVersions = [];
 
@@ -54,6 +61,7 @@ public partial class MainWindow : Window
     private Point _shelfDragStartPoint;
     private ShelfItem? _selectedShelfItem;
     private AppSettings _settings;
+    private ExpandedMode _expandedMode = ExpandedMode.Files;
 
     public MainWindow()
     {
@@ -63,8 +71,11 @@ public partial class MainWindow : Window
         _shelfService = new ShelfService(_iCloudDriveLocator);
         _settingsService = new AppSettingsService();
         _startupRegistrationService = new StartupRegistrationService();
+        _mediaSessionService = new MediaSessionService();
         _settings = _settingsService.Load();
         _settings.LaunchAtStartup = _startupRegistrationService.IsEnabled();
+        _mediaSessionService.StateChanged += MediaSessionService_StateChanged;
+        InitializeMediaUi();
 
         ShelfList.ItemsSource = _shelfItems;
 
@@ -92,17 +103,19 @@ public partial class MainWindow : Window
         SourceInitialized += Window_SourceInitialized;
     }
 
-    private void Window_Loaded(object sender, RoutedEventArgs e)
+    private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
         Width = ExpandedWidth;
         Height = CollapsedHeight;
         ApplyRestingCollapsedNotchVisualState();
+        UpdateExpandedModePresentation();
 
         ApplyWindowModeSettings();
         LoadShelfItems();
         UpdateDropZoneVisuals();
         PositionWindow();
         _hoverTimer.Start();
+        await InitializeMediaSessionAsync();
     }
 
     private void Window_SourceInitialized(object? sender, EventArgs e)
@@ -114,5 +127,49 @@ public partial class MainWindow : Window
     private void NotchBody_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         UpdateAnimatedNotchShape();
+    }
+
+    private void FilesModeButton_Click(object sender, RoutedEventArgs e)
+    {
+        _expandedMode = ExpandedMode.Files;
+        UpdateExpandedModePresentation();
+        RecalculateExpandedLayout();
+    }
+
+    private void MusicModeButton_Click(object sender, RoutedEventArgs e)
+    {
+        _expandedMode = ExpandedMode.Music;
+        UpdateExpandedModePresentation();
+        RecalculateExpandedLayout();
+    }
+
+    private void UpdateExpandedModePresentation()
+    {
+        var isFilesMode = _expandedMode == ExpandedMode.Files;
+
+        if (FilesView is not null)
+        {
+            FilesView.Visibility = isFilesMode ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        if (MusicView is not null)
+        {
+            MusicView.Visibility = isFilesMode ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        if (ModeSwitchPanel is not null)
+        {
+            ModeSwitchPanel.Visibility = _isExpanded ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        if (FilesModeButton is not null)
+        {
+            FilesModeButton.Opacity = isFilesMode ? 1.0 : 0.52;
+        }
+
+        if (MusicModeButton is not null)
+        {
+            MusicModeButton.Opacity = isFilesMode ? 0.52 : 1.0;
+        }
     }
 }
