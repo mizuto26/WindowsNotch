@@ -65,11 +65,6 @@ public partial class MainWindow
         _settingsService.Save(_settings);
     }
 
-    private void ApplyWindowModeSettings()
-    {
-        RefreshOverlayModeForCurrentState();
-    }
-
     private void RefreshOverlayModeForCurrentState(bool immediateTopUpdate = false)
     {
         RefreshOverlayMode(isInteractive: false, immediateTopUpdate);
@@ -82,28 +77,16 @@ public partial class MainWindow
 
     private bool ShouldDisplayOverlay(bool isInteractive)
     {
-        if (_isShelfItemDragActive)
-        {
-            _notchCoveredSinceUtc = null;
-            return false;
-        }
-
         var isCovered = IsOtherWindowCoveringNotchArea();
 
         return isInteractive ||
-               _isExpanded ||
+               IsPresented ||
                _isCollapseAnimationActive ||
                !IsNotchCoveredLongEnough(isCovered);
     }
 
     private bool ShouldDisplayOverlayAfterCollapse()
     {
-        if (_isShelfItemDragActive)
-        {
-            _notchCoveredSinceUtc = null;
-            return false;
-        }
-
         return _isDragOver ||
                _isShareDropTargetActive ||
                _isShelfDropTargetActive ||

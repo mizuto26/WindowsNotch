@@ -1,9 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Windows;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Threading;
 
 namespace WindowsNotch.App;
 
@@ -13,42 +11,98 @@ public partial class MainWindow
     {
         UpdateAnimatedNotchShape();
 
+        var now = DateTime.UtcNow;
         var cursorPoint = GetCursorPositionInDeviceIndependentPixels();
-        if (Mouse.LeftButton == MouseButtonState.Pressed &&
-            IsCursorInHotZone(cursorPoint))
-        {
-            _lastInteractiveUtc = DateTime.UtcNow;
-            RefreshOverlayMode(isInteractive: true);
-            SetExpanded(true);
-        }
-
-        var isInteractive =
+        var isDragInteractive =
             _isDragOver ||
             _isShareDropTargetActive ||
-            _isShelfDropTargetActive ||
+            _isShelfDropTargetActive;
+        var isExpandedAreaInteractive =
+            IsExpanded &&
+            !_isCollapseAnimationActive &&
+            IsCursorOverExpandedWindow(cursorPoint);
+        var isPostDropHoldInteractive =
+            _isWaitingForPostDropExit &&
+            (isExpandedAreaInteractive || IsCursorInHotZone(cursorPoint));
+        var isHoverInteractive =
             IsCursorInHotZone(cursorPoint) ||
-            (!_isCollapseAnimationActive && IsCursorOverNotchBody(cursorPoint));
+            (!_isCollapseAnimationActive && IsCursorOverNotchBody(cursorPoint)) ||
+            isExpandedAreaInteractive ||
+            isPostDropHoldInteractive;
+        var isInteractive = isDragInteractive || isHoverInteractive;
+
+        if (_isWaitingForPostDropExit)
+        {
+            RefreshOverlayMode(isInteractive: true);
+
+            if (isPostDropHoldInteractive || isDragInteractive)
+            {
+                _postDropExitStartedUtc = null;
+                _lastInteractiveUtc = now;
+                SetExpansionStage(NotchExpansionStage.Expanded);
+                return;
+            }
+
+            _postDropExitStartedUtc ??= now;
+            if (now - _postDropExitStartedUtc.Value < TimeSpan.FromMilliseconds(PostDropExitDelayMilliseconds))
+            {
+                return;
+            }
+
+            _isWaitingForPostDropExit = false;
+            _postDropExitStartedUtc = null;
+            _keepExpandedUntilUtc = null;
+        }
 
         RefreshOverlayMode(isInteractive);
 
-        if (isInteractive)
+        if (isDragInteractive)
         {
-            _lastInteractiveUtc = DateTime.UtcNow;
-            SetExpanded(true);
+            _hoverStartedUtc = null;
+            _keepExpandedUntilUtc = null;
+            _lastInteractiveUtc = now;
+            SetExpansionStage(NotchExpansionStage.Expanded);
             return;
         }
 
-        if (!_isExpanded)
+        if (isHoverInteractive)
+        {
+            _hoverStartedUtc ??= now;
+            _keepExpandedUntilUtc = null;
+            _lastInteractiveUtc = now;
+
+            var hoverDuration = now - _hoverStartedUtc.Value;
+            var targetStage = hoverDuration >= TimeSpan.FromMilliseconds(PreviewExpandDelayMilliseconds)
+                ? NotchExpansionStage.Expanded
+                : NotchExpansionStage.Preview;
+
+            SetExpansionStage(targetStage);
+            return;
+        }
+
+        _hoverStartedUtc = null;
+
+        if (!IsPresented)
         {
             return;
         }
 
-        if (DateTime.UtcNow - _lastInteractiveUtc < TimeSpan.FromMilliseconds(CollapseDelayMilliseconds))
+        if (_keepExpandedUntilUtc is DateTime keepExpandedUntilUtc)
+        {
+            if (now < keepExpandedUntilUtc)
+            {
+                return;
+            }
+
+            _keepExpandedUntilUtc = null;
+        }
+
+        if (now - _lastInteractiveUtc < TimeSpan.FromMilliseconds(CollapseDelayMilliseconds))
         {
             return;
         }
 
-        SetExpanded(false);
+        SetExpansionStage(NotchExpansionStage.Collapsed);
     }
 
     private void TopmostTimer_Tick(object? sender, EventArgs e)
@@ -72,7 +126,7 @@ public partial class MainWindow
         var collapsedTop = GetWindowTop(overlayModeActive);
 
         ApplyWindowBounds(GetWindowLeft(ExpandedWidth), collapsedTop, ExpandedWidth, CollapsedHeight);
-        ApplyRestingCollapsedNotchVisualState();
+        ApplyImmediateNotchScale(GetCollapsedScaleX(), 1.0);
         UpdateExpandedModePresentation();
 
         UpdateOverlayMode(overlayModeActive, immediateTopUpdate: true);
@@ -101,38 +155,98 @@ public partial class MainWindow
                cursorPoint.Y <= bodyBottom;
     }
 
-    private void SetExpanded(bool expanded)
+    private bool IsCursorOverExpandedWindow(Point cursorPoint)
     {
-        if (_isExpanded == expanded)
+        var windowLeft = Left;
+        var windowTop = Top;
+        var windowRight = windowLeft + Width;
+        var windowBottom = windowTop + Height;
+
+        return cursorPoint.X >= windowLeft &&
+               cursorPoint.X <= windowRight &&
+               cursorPoint.Y >= windowTop &&
+               cursorPoint.Y <= windowBottom;
+    }
+
+    private void SetExpansionStage(NotchExpansionStage stage)
+    {
+        if (stage == NotchExpansionStage.Collapsed &&
+            _keepExpandedUntilUtc is DateTime keepExpandedUntilUtc &&
+            DateTime.UtcNow < keepExpandedUntilUtc)
         {
             return;
         }
 
-        _isExpanded = expanded;
-        _isCollapseAnimationActive = !expanded;
-
-        if (expanded)
+        if (_expansionStage == stage)
         {
-            _pendingCollapseOverlayModeActive = null;
-            SettingsButton.Visibility = Visibility.Collapsed;
-            ExpandedContentViewport.Opacity = 0.0;
-            UpdateExpandedModePresentation();
-            _collapseAnimationTimer.Stop();
-            PrepareExpandedWindowForAnimation(() =>
-            {
-                ApplyWindowBounds(Left, GetWindowTop(overlayModeActive: true), ExpandedWidth, _expandedWindowHeight);
-                ExpandedContentViewport.Height = _expandedContentHeight;
-                ExpandedContentScaleTransform.ScaleX = 0.97;
-                ExpandedContentScaleTransform.ScaleY = 0.9;
-                ExpandedContentTranslateTransform.Y = -6.0;
-            });
+            return;
         }
-        else
+
+        var previousStage = _expansionStage;
+        _expansionStage = stage;
+
+        switch (stage)
         {
-            SettingsButton.Visibility = Visibility.Collapsed;
-            UpdateExpandedModePresentation();
-            _collapseAnimationTimer.Stop();
+            case NotchExpansionStage.Preview:
+                TransitionToPreview();
+                return;
+            case NotchExpansionStage.Expanded:
+                TransitionToExpanded(previousStage);
+                return;
+            default:
+                TransitionToCollapsed(previousStage);
+                return;
+        }
+    }
+
+    private void TransitionToPreview()
+    {
+        _isCollapseAnimationActive = false;
+        _pendingCollapseOverlayModeActive = null;
+        _collapseAnimationTimer.Stop();
+
+        SettingsButton.Visibility = Visibility.Collapsed;
+        UpdateExpandedModePresentation();
+        HideExpandedContentImmediately();
+
+        ApplyWindowBounds(GetWindowLeft(ExpandedWidth), GetWindowTop(overlayModeActive: true), ExpandedWidth, CollapsedHeight);
+        RefreshOverlayMode(isInteractive: true, immediateTopUpdate: true);
+
+        AnimateNotchScale(
+            GetPreviewScaleX(),
+            GetPreviewCollapsedScaleY(),
+            ExpandAnimationMilliseconds);
+    }
+
+    private void TransitionToExpanded(NotchExpansionStage previousStage)
+    {
+        _isCollapseAnimationActive = false;
+        _pendingCollapseOverlayModeActive = null;
+        _collapseAnimationTimer.Stop();
+
+        SettingsButton.Visibility = Visibility.Collapsed;
+        UpdateExpandedModePresentation();
+        HideExpandedContentImmediately();
+
+        PrepareExpandedWindowForAnimation(
+            previousStage == NotchExpansionStage.Preview ? GetPreviewScaleX() : GetCollapsedScaleX(),
+            previousStage == NotchExpansionStage.Preview ? GetPreviewExpandedHostScaleY() : GetCollapsedScaleY());
+
+        RefreshOverlayMode(isInteractive: true, immediateTopUpdate: true);
+        AnimateNotchScale(1.0, 1.0, ExpandAnimationMilliseconds);
+        AnimateExpandedContentIn(ExpandAnimationMilliseconds);
+    }
+
+    private void TransitionToCollapsed(NotchExpansionStage previousStage)
+    {
+        SettingsButton.Visibility = Visibility.Collapsed;
+        UpdateExpandedModePresentation();
+
+        if (previousStage == NotchExpansionStage.Expanded)
+        {
+            _isCollapseAnimationActive = true;
             _pendingCollapseOverlayModeActive = ShouldDisplayOverlayAfterCollapse();
+            _collapseAnimationTimer.Stop();
 
             if (_pendingCollapseOverlayModeActive == false)
             {
@@ -143,65 +257,22 @@ public partial class MainWindow
             }
 
             _collapseAnimationTimer.Start();
+            HideExpandedContentImmediately();
+            RefreshOverlayMode(
+                isInteractive: _isDragOver || _isShareDropTargetActive || _isShelfDropTargetActive,
+                immediateTopUpdate: false);
+            AnimateNotchScale(GetCollapsedScaleX(), GetCollapsedScaleY(), CollapseAnimationMilliseconds);
+            return;
         }
 
-        var animationDuration = expanded ? ExpandAnimationMilliseconds : CollapseAnimationMilliseconds;
-        var targetNotchScaleX = expanded ? 1.0 : GetCollapsedScaleX();
-        var targetNotchScaleY = expanded ? 1.0 : GetCollapsedScaleY();
-        var targetOpacity = expanded ? 1.0 : 0.0;
-        var targetScaleX = expanded ? 1.0 : 0.97;
-        var targetScaleY = expanded ? 1.0 : 0.9;
-        var targetTranslateY = expanded ? 0.0 : -6.0;
+        _isCollapseAnimationActive = false;
+        _pendingCollapseOverlayModeActive = null;
+        _collapseAnimationTimer.Stop();
 
-        RefreshOverlayMode(
-            isInteractive: expanded || _isDragOver || _isShareDropTargetActive || _isShelfDropTargetActive,
-            immediateTopUpdate: expanded);
-
-        if (!expanded)
-        {
-            CancelTrackedAnimation(ExpandedContentViewport, FrameworkElement.HeightProperty);
-            CancelTrackedAnimation(ExpandedContentViewport, UIElement.OpacityProperty);
-            CancelTrackedAnimation(ExpandedContentScaleTransform, ScaleTransform.ScaleXProperty);
-            CancelTrackedAnimation(ExpandedContentScaleTransform, ScaleTransform.ScaleYProperty);
-            CancelTrackedAnimation(ExpandedContentTranslateTransform, TranslateTransform.YProperty);
-
-            ExpandedContentViewport.Height = 0.0;
-            ExpandedContentViewport.Opacity = 0.0;
-            ExpandedContentScaleTransform.ScaleX = targetScaleX;
-            ExpandedContentScaleTransform.ScaleY = targetScaleY;
-            ExpandedContentTranslateTransform.Y = targetTranslateY;
-        }
-
-        AnimateElementDimension(NotchScaleTransform, ScaleTransform.ScaleXProperty, targetNotchScaleX, animationDuration, new QuinticEase
-        {
-            EasingMode = EasingMode.EaseOut,
-        });
-        AnimateElementDimension(NotchScaleTransform, ScaleTransform.ScaleYProperty, targetNotchScaleY, animationDuration, new ExponentialEase
-        {
-            EasingMode = EasingMode.EaseOut,
-            Exponent = 5,
-        });
-
-        if (expanded)
-        {
-            AnimateElementDimension(ExpandedContentViewport, UIElement.OpacityProperty, targetOpacity, animationDuration, new QuadraticEase
-            {
-                EasingMode = EasingMode.EaseOut,
-            });
-            AnimateElementDimension(ExpandedContentScaleTransform, ScaleTransform.ScaleXProperty, targetScaleX, animationDuration, new QuinticEase
-            {
-                EasingMode = EasingMode.EaseOut,
-            });
-            AnimateElementDimension(ExpandedContentScaleTransform, ScaleTransform.ScaleYProperty, targetScaleY, animationDuration, new ExponentialEase
-            {
-                EasingMode = EasingMode.EaseOut,
-                Exponent = 5,
-            });
-            AnimateElementDimension(ExpandedContentTranslateTransform, TranslateTransform.YProperty, targetTranslateY, animationDuration, new CubicEase
-            {
-                EasingMode = EasingMode.EaseOut,
-            });
-        }
+        HideExpandedContentImmediately();
+        ApplyWindowBounds(GetWindowLeft(ExpandedWidth), GetWindowTop(overlayModeActive: true), ExpandedWidth, CollapsedHeight);
+        RefreshOverlayMode(isInteractive: false, immediateTopUpdate: false);
+        AnimateNotchScale(GetCollapsedScaleX(), 1.0, CollapseAnimationMilliseconds);
     }
 
     private void AnimateElementDimension(
@@ -281,34 +352,89 @@ public partial class MainWindow
         var scaleY = Math.Max(0.001, NotchScaleTransform.ScaleY);
         var radiusX = VisualBottomCornerRadius / scaleX;
         var radiusY = VisualBottomCornerRadius / scaleY;
-        NotchBody.Clip = CreateNotchClipGeometry(NotchBody.ActualWidth, NotchBody.ActualHeight, radiusX, radiusY);
+        NotchBody.Clip = CreateNotchClipGeometry(
+            NotchBody.ActualWidth,
+            NotchBody.ActualHeight,
+            radiusX,
+            radiusY);
     }
 
-    private void PrepareExpandedWindowForAnimation(Action updateAction)
+    private void PrepareExpandedWindowForAnimation(double collapsedScaleX, double collapsedScaleY)
     {
-        updateAction();
-        Dispatcher.BeginInvoke(() =>
+        ApplyWindowBounds(GetWindowLeft(ExpandedWidth), GetWindowTop(overlayModeActive: true), ExpandedWidth, _expandedWindowHeight);
+        ExpandedContentViewport.Height = _expandedContentHeight;
+        ExpandedContentScaleTransform.ScaleX = 0.97;
+        ExpandedContentScaleTransform.ScaleY = 0.9;
+        ExpandedContentTranslateTransform.Y = -6.0;
+        ApplyImmediateNotchScale(collapsedScaleX, collapsedScaleY);
+        SettingsButton.Visibility = Visibility.Visible;
+        UpdateExpandedModePresentation();
+    }
+
+    private void ApplyImmediateNotchScale(double scaleX, double scaleY)
+    {
+        UpdateLayout();
+        NotchScaleTransform.ScaleX = scaleX;
+        NotchScaleTransform.ScaleY = scaleY;
+        UpdateAnimatedNotchShape();
+    }
+
+    private void AnimateNotchScale(double targetScaleX, double targetScaleY, int durationMilliseconds)
+    {
+        AnimateElementDimension(NotchScaleTransform, ScaleTransform.ScaleXProperty, targetScaleX, durationMilliseconds, new QuinticEase
         {
-            ApplyAnimatedCollapsedNotchVisualState();
-            SettingsButton.Visibility = Visibility.Visible;
-            UpdateExpandedModePresentation();
-        }, DispatcherPriority.Render);
+            EasingMode = EasingMode.EaseOut,
+        });
+        AnimateElementDimension(NotchScaleTransform, ScaleTransform.ScaleYProperty, targetScaleY, durationMilliseconds, new ExponentialEase
+        {
+            EasingMode = EasingMode.EaseOut,
+            Exponent = 5,
+        });
     }
 
-    private void ApplyRestingCollapsedNotchVisualState()
+    private void AnimateExpandedContentIn(int durationMilliseconds)
     {
-        UpdateLayout();
-        NotchScaleTransform.ScaleX = GetCollapsedScaleX();
-        NotchScaleTransform.ScaleY = 1.0;
-        UpdateAnimatedNotchShape();
+        AnimateElementDimension(ExpandedContentViewport, UIElement.OpacityProperty, 1.0, durationMilliseconds, new QuadraticEase
+        {
+            EasingMode = EasingMode.EaseOut,
+        });
+        AnimateElementDimension(ExpandedContentScaleTransform, ScaleTransform.ScaleXProperty, 1.0, durationMilliseconds, new QuinticEase
+        {
+            EasingMode = EasingMode.EaseOut,
+        });
+        AnimateElementDimension(ExpandedContentScaleTransform, ScaleTransform.ScaleYProperty, 1.0, durationMilliseconds, new ExponentialEase
+        {
+            EasingMode = EasingMode.EaseOut,
+            Exponent = 5,
+        });
+        AnimateElementDimension(ExpandedContentTranslateTransform, TranslateTransform.YProperty, 0.0, durationMilliseconds, new CubicEase
+        {
+            EasingMode = EasingMode.EaseOut,
+        });
     }
 
-    private void ApplyAnimatedCollapsedNotchVisualState()
+    private void ShowExpandedContentImmediately()
     {
-        UpdateLayout();
-        NotchScaleTransform.ScaleX = GetCollapsedScaleX();
-        NotchScaleTransform.ScaleY = GetCollapsedScaleY();
-        UpdateAnimatedNotchShape();
+        ExpandedContentViewport.Height = _expandedContentHeight;
+        ExpandedContentViewport.Opacity = 1.0;
+        ExpandedContentScaleTransform.ScaleX = 1.0;
+        ExpandedContentScaleTransform.ScaleY = 1.0;
+        ExpandedContentTranslateTransform.Y = 0.0;
+    }
+
+    private void HideExpandedContentImmediately()
+    {
+        CancelTrackedAnimation(ExpandedContentViewport, FrameworkElement.HeightProperty);
+        CancelTrackedAnimation(ExpandedContentViewport, UIElement.OpacityProperty);
+        CancelTrackedAnimation(ExpandedContentScaleTransform, ScaleTransform.ScaleXProperty);
+        CancelTrackedAnimation(ExpandedContentScaleTransform, ScaleTransform.ScaleYProperty);
+        CancelTrackedAnimation(ExpandedContentTranslateTransform, TranslateTransform.YProperty);
+
+        ExpandedContentViewport.Height = 0.0;
+        ExpandedContentViewport.Opacity = 0.0;
+        ExpandedContentScaleTransform.ScaleX = 0.97;
+        ExpandedContentScaleTransform.ScaleY = 0.9;
+        ExpandedContentTranslateTransform.Y = -6.0;
     }
 
     private void AnimateWindowDimension(
@@ -335,7 +461,11 @@ public partial class MainWindow
         BeginAnimation(property, animation, HandoffBehavior.SnapshotAndReplace);
     }
 
-    private static Geometry CreateNotchClipGeometry(double width, double height, double bottomRadiusX, double bottomRadiusY)
+    private static Geometry CreateNotchClipGeometry(
+        double width,
+        double height,
+        double bottomRadiusX,
+        double bottomRadiusY)
     {
         if (width <= 0 || height <= 0)
         {
@@ -391,13 +521,29 @@ public partial class MainWindow
             : collapsedBodyHeight / expandedBodyHeight;
     }
 
+    private double GetPreviewScaleX()
+    {
+        var collapsedScaleX = GetCollapsedScaleX();
+        return collapsedScaleX + ((1.0 - collapsedScaleX) * PreviewScaleProgress);
+    }
+
+    private static double GetPreviewCollapsedScaleY()
+    {
+        return PreviewHeightMultiplier;
+    }
+
+    private double GetPreviewExpandedHostScaleY()
+    {
+        return GetCollapsedScaleY() * PreviewHeightMultiplier;
+    }
+
     private void PositionWindow()
     {
         Width = ExpandedWidth;
         Left = GetWindowLeft(ExpandedWidth);
         Top = GetWindowTop(overlayModeActive: ShouldDisplayOverlay(isInteractive: false));
         SettingsButton.Visibility = Visibility.Collapsed;
-        UpdateAnimatedNotchShape();
+        ApplyImmediateNotchScale(GetCollapsedScaleX(), 1.0);
         RefreshOverlayModeForCurrentState();
     }
 

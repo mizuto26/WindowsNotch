@@ -2,9 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Threading;
 using WindowsNotch.App.Models;
 
 namespace WindowsNotch.App;
@@ -42,8 +40,9 @@ public partial class MainWindow
         if (hasFileDrop)
         {
             _lastInteractiveUtc = DateTime.UtcNow;
+            _hoverStartedUtc = null;
             RefreshOverlayMode(isInteractive: true);
-            SetExpanded(true);
+            SetExpansionStage(NotchExpansionStage.Expanded);
         }
     }
 
@@ -69,9 +68,8 @@ public partial class MainWindow
     {
         _isShareDropTargetActive = false;
         _isDragOver = false;
-        _lastInteractiveUtc = DateTime.UtcNow;
         UpdateDropZoneVisuals();
-        RefreshOverlayMode(isInteractive: true);
+        KeepExpandedAfterDrop();
         e.Handled = true;
 
         if (e.Data.GetData(DataFormats.FileDrop) is not string[] entries || entries.Length == 0)
@@ -82,6 +80,15 @@ public partial class MainWindow
         try
         {
             var result = await _shelfService.SendEntriesToICloudAsync(entries);
+            KeepExpandedAfterDrop();
+            if (result.Success)
+            {
+                SetShareStatusSuccess();
+            }
+            else
+            {
+                SetShareStatusIdle();
+            }
             if (!result.Success)
             {
                 MessageBox.Show(this, result.Message, "WindowsNotch", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -115,9 +122,8 @@ public partial class MainWindow
     {
         _isShelfDropTargetActive = false;
         _isDragOver = false;
-        _lastInteractiveUtc = DateTime.UtcNow;
         UpdateDropZoneVisuals();
-        RefreshOverlayMode(isInteractive: true);
+        KeepExpandedAfterDrop();
         e.Handled = true;
 
         if (e.Data.GetData(DataFormats.FileDrop) is not string[] entries || entries.Length == 0)
@@ -129,7 +135,7 @@ public partial class MainWindow
         {
             var updatedItems = await _shelfService.StashEntriesAsync(entries);
             ReplaceShelfItems(updatedItems);
-            SetExpanded(true);
+            KeepExpandedAfterDrop();
         }
         catch (Exception ex)
         {
@@ -149,8 +155,9 @@ public partial class MainWindow
         if (hasFileDrop)
         {
             _lastInteractiveUtc = DateTime.UtcNow;
+            _hoverStartedUtc = null;
             RefreshOverlayMode(isInteractive: true);
-            SetExpanded(true);
+            SetExpansionStage(NotchExpansionStage.Expanded);
         }
 
         UpdateDropZoneVisuals();
@@ -192,18 +199,20 @@ public partial class MainWindow
     private void BeginShelfDrag(ShelfItem item)
     {
         var data = new DataObject(DataFormats.FileDrop, new[] { item.StoredPath });
-        ShowDragPreview(item);
-        _isShelfItemDragActive = true;
-        UpdateOverlayMode(overlayModeActive: false, immediateTopUpdate: true);
+        _topmostTimer.Stop();
+        Topmost = false;
+        UpdateWindowZOrder(HWND_NOTOPMOST);
+        SetWindowClickThrough(isEnabled: true);
+        RefreshOverlayMode(isInteractive: true, immediateTopUpdate: true);
+        SetExpansionStage(NotchExpansionStage.Expanded);
 
         try
         {
-            DragDrop.DoDragDrop(ShelfList, data, DragDropEffects.Copy);
+            DragDrop.DoDragDrop(ShelfList, data, DragDropEffects.Copy | DragDropEffects.Move);
         }
         finally
         {
-            _isShelfItemDragActive = false;
-            HideDragPreview();
+            SetWindowClickThrough(isEnabled: false);
             RefreshOverlayModeForCurrentState(immediateTopUpdate: true);
         }
     }
@@ -265,121 +274,40 @@ public partial class MainWindow
     private void UpdateDropZoneVisuals()
     {
         ShareDropZone.Background = _isShareDropTargetActive
-            ? new SolidColorBrush(Color.FromArgb(42, 102, 209, 255))
-            : new SolidColorBrush(Color.FromArgb(14, 255, 255, 255));
+            ? new SolidColorBrush(Color.FromArgb(54, 72, 137, 255))
+            : new SolidColorBrush(Color.FromArgb(255, 0, 0, 0));
 
         ShareDropZone.BorderBrush = _isShareDropTargetActive
-            ? new SolidColorBrush(Color.FromArgb(90, 102, 209, 255))
-            : new SolidColorBrush(Color.FromArgb(24, 255, 255, 255));
+            ? new SolidColorBrush(Color.FromArgb(120, 126, 184, 255))
+            : Brushes.Transparent;
+
+        EmptyShelfPanel.Background = _isShelfDropTargetActive
+            ? new SolidColorBrush(Color.FromArgb(54, 72, 137, 255))
+            : new SolidColorBrush(Color.FromArgb(255, 0, 0, 0));
+
+        EmptyShelfPanel.BorderBrush = _isShelfDropTargetActive
+            ? new SolidColorBrush(Color.FromArgb(120, 126, 184, 255))
+            : Brushes.Transparent;
 
         ShelfPanel.BorderBrush = _isShelfDropTargetActive
             ? new SolidColorBrush(Color.FromArgb(90, 102, 209, 255))
-            : new SolidColorBrush(Color.FromArgb(24, 255, 255, 255));
-    }
-
-    private void ShowDragPreview(ShelfItem item)
-    {
-        DragPreviewNameText.Text = item.DisplayName;
-        DragPreviewKindText.Text = item.KindLabel;
-
-        if (item.ThumbnailSource is not null)
-        {
-            DragPreviewImage.Source = item.ThumbnailSource;
-            DragPreviewImage.Visibility = Visibility.Visible;
-            DragPreviewFallbackBadge.Visibility = Visibility.Collapsed;
-        }
-        else
-        {
-            DragPreviewImage.Source = null;
-            DragPreviewImage.Visibility = Visibility.Collapsed;
-            DragPreviewFallbackBadge.Visibility = Visibility.Visible;
-        }
-
-        UpdateDragPreviewPosition();
-        DragPreviewPopup.IsOpen = true;
-        _dragPreviewTimer.Start();
-    }
-
-    private void HideDragPreview()
-    {
-        _dragPreviewTimer.Stop();
-        DragPreviewPopup.IsOpen = false;
-    }
-
-    private void DragPreviewPopup_Opened(object sender, EventArgs e)
-    {
-        Dispatcher.BeginInvoke(EnsureDragPreviewPopupTopmost, DispatcherPriority.Render);
-    }
-
-    private void DragPreviewTimer_Tick(object? sender, EventArgs e)
-    {
-        UpdateDragPreviewPosition();
-    }
-
-    private void UpdateDragPreviewPosition()
-    {
-        var cursorPoint = GetCursorPositionInDeviceIndependentPixels();
-
-        if (DragPreviewPopup.Child is FrameworkElement previewElement)
-        {
-            previewElement.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            var previewSize = previewElement.DesiredSize;
-
-            DragPreviewPopup.HorizontalOffset = cursorPoint.X - (previewSize.Width / 2.0);
-            DragPreviewPopup.VerticalOffset = cursorPoint.Y - (previewSize.Height / 2.0);
-            return;
-        }
-
-        DragPreviewPopup.HorizontalOffset = cursorPoint.X;
-        DragPreviewPopup.VerticalOffset = cursorPoint.Y;
-    }
-
-    private void EnsureDragPreviewPopupTopmost()
-    {
-        if (DragPreviewPopup.Child is not FrameworkElement child)
-        {
-            return;
-        }
-
-        if (PresentationSource.FromVisual(child) is not HwndSource popupSource)
-        {
-            return;
-        }
-
-        SetWindowPos(
-            popupSource.Handle,
-            HWND_TOPMOST,
-            0,
-            0,
-            0,
-            0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            : Brushes.Transparent;
     }
 
     private void RecalculateExpandedLayout()
     {
-        ExpandedContentViewport.Height = double.NaN;
-
         ExpandedContentRoot.Measure(new Size(ExpandedWidth - 32, double.PositiveInfinity));
         _expandedContentHeight = ExpandedContentRoot.DesiredSize.Height;
         _expandedWindowHeight = CollapsedHeight + ExpandedContentTopSpacing + _expandedContentHeight;
 
-        if (_isExpanded)
+        if (IsExpanded)
         {
-            ExpandedContentViewport.Height = _expandedContentHeight;
-            ExpandedContentViewport.Opacity = 1.0;
-            ExpandedContentScaleTransform.ScaleX = 1.0;
-            ExpandedContentScaleTransform.ScaleY = 1.0;
-            ExpandedContentTranslateTransform.Y = 0.0;
+            ShowExpandedContentImmediately();
             Height = _expandedWindowHeight;
         }
         else
         {
-            ExpandedContentViewport.Height = 0;
-            ExpandedContentViewport.Opacity = 0.0;
-            ExpandedContentScaleTransform.ScaleX = 0.97;
-            ExpandedContentScaleTransform.ScaleY = 0.9;
-            ExpandedContentTranslateTransform.Y = -6.0;
+            HideExpandedContentImmediately();
             Height = CollapsedHeight;
         }
     }

@@ -68,6 +68,18 @@ public partial class MainWindow
         int cy,
         uint uFlags);
 
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+    private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW", SetLastError = true)]
+    private static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongW", SetLastError = true)]
+    private static extern int SetWindowLong32(IntPtr hWnd, int nIndex, int dwNewLong);
+
     private static readonly IntPtr HWND_TOPMOST = new(-1);
     private static readonly IntPtr HWND_NOTOPMOST = new(-2);
     private const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
@@ -76,6 +88,8 @@ public partial class MainWindow
     private const uint SWP_NOACTIVATE = 0x0010;
     private const uint SWP_SHOWWINDOW = 0x0040;
     private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+    private const int GWL_EXSTYLE = -20;
+    private const int WS_EX_TRANSPARENT = 0x00000020;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint
@@ -114,5 +128,39 @@ public partial class MainWindow
         }
 
         return GetWindowRect(windowHandle, out windowRect);
+    }
+
+    private static IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex)
+    {
+        return IntPtr.Size == 8
+            ? GetWindowLongPtr64(hWnd, nIndex)
+            : new IntPtr(GetWindowLong32(hWnd, nIndex));
+    }
+
+    private static IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr newValue)
+    {
+        return IntPtr.Size == 8
+            ? SetWindowLongPtr64(hWnd, nIndex, newValue)
+            : new IntPtr(SetWindowLong32(hWnd, nIndex, newValue.ToInt32()));
+    }
+
+    private void SetWindowClickThrough(bool isEnabled)
+    {
+        if (_windowHandle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var currentStyles = GetWindowLongPtr(_windowHandle, GWL_EXSTYLE).ToInt64();
+        var updatedStyles = isEnabled
+            ? currentStyles | WS_EX_TRANSPARENT
+            : currentStyles & ~WS_EX_TRANSPARENT;
+
+        if (updatedStyles == currentStyles)
+        {
+            return;
+        }
+
+        SetWindowLongPtr(_windowHandle, GWL_EXSTYLE, new IntPtr(updatedStyles));
     }
 }
