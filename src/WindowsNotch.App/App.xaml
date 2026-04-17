@@ -407,7 +407,7 @@
         <Style x:Key="MusicProgressSliderStyle"
                TargetType="Slider">
             <Setter Property="Foreground"
-                    Value="{StaticResource AccentBrush}" />
+                    Value="#FFF5F6F8" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Slider">
@@ -421,6 +421,7 @@
                                 <Track.DecreaseRepeatButton>
                                     <RepeatButton Command="Slider.DecreaseLarge"
                                                   Focusable="False"
+                                                  Foreground="{TemplateBinding Foreground}"
                                                   BorderThickness="0"
                                                   Background="Transparent">
                                         <RepeatButton.Template>
@@ -436,6 +437,7 @@
                                 <Track.IncreaseRepeatButton>
                                     <RepeatButton Command="Slider.IncreaseLarge"
                                                   Focusable="False"
+                                                  Foreground="{TemplateBinding Foreground}"
                                                   BorderThickness="0"
                                                   Background="Transparent">
                                         <RepeatButton.Template>

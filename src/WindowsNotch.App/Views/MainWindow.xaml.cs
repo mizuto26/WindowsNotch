@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using WindowsNotch.App.Models;
@@ -44,6 +46,7 @@ public partial class MainWindow : Window
     private const int OverlayHideDelayMilliseconds = 140;
     private const int TopmostRefreshMilliseconds = 500;
     private const int ModeSwitchDebounceMilliseconds = 220;
+    private const int ModeSwitchPressTimeoutMilliseconds = 600;
     private const double PreviewScaleProgress = 0.12;
     private const double PreviewHeightMultiplier = 1.08;
 
@@ -80,6 +83,8 @@ public partial class MainWindow : Window
     private AppSettings _settings;
     private ExpandedMode _expandedMode = ExpandedMode.Files;
     private DateTime _lastModeSwitchUtc = DateTime.MinValue;
+    private ExpandedMode? _pendingModeSwitchMode;
+    private DateTime _pendingModeSwitchStartedUtc = DateTime.MinValue;
 
     private bool IsExpanded => _expansionStage == NotchExpansionStage.Expanded;
     private bool IsPresented => _expansionStage != NotchExpansionStage.Collapsed;
@@ -152,16 +157,34 @@ public partial class MainWindow : Window
 
     private void FilesModeButton_Click(object sender, RoutedEventArgs e)
     {
-        SwitchExpandedMode(ExpandedMode.Files);
+        if (CanApplyModeSwitch(ExpandedMode.Files, sender as Button))
+        {
+            SwitchExpandedMode(ExpandedMode.Files);
+        }
     }
 
     private void MusicModeButton_Click(object sender, RoutedEventArgs e)
     {
-        SwitchExpandedMode(ExpandedMode.Music);
+        if (CanApplyModeSwitch(ExpandedMode.Music, sender as Button))
+        {
+            SwitchExpandedMode(ExpandedMode.Music);
+        }
+    }
+
+    private void FilesModeButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        RegisterModeSwitchPress(ExpandedMode.Files);
+    }
+
+    private void MusicModeButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        RegisterModeSwitchPress(ExpandedMode.Music);
     }
 
     private void SwitchExpandedMode(ExpandedMode mode)
     {
+        _pendingModeSwitchMode = null;
+
         var now = DateTime.UtcNow;
         if (_expandedMode == mode)
         {
@@ -177,6 +200,37 @@ public partial class MainWindow : Window
         _expandedMode = mode;
         UpdateExpandedModePresentation();
         RecalculateExpandedLayout();
+    }
+
+    private void RegisterModeSwitchPress(ExpandedMode mode)
+    {
+        _pendingModeSwitchMode = mode;
+        _pendingModeSwitchStartedUtc = DateTime.UtcNow;
+    }
+
+    private bool CanApplyModeSwitch(ExpandedMode mode, Button? sourceButton)
+    {
+        if (!IsExpanded || _isCollapseAnimationActive)
+        {
+            _pendingModeSwitchMode = null;
+            return false;
+        }
+
+        if (sourceButton?.IsMouseOver != true)
+        {
+            _pendingModeSwitchMode = null;
+            return false;
+        }
+
+        var now = DateTime.UtcNow;
+        if (_pendingModeSwitchMode != mode ||
+            now - _pendingModeSwitchStartedUtc > TimeSpan.FromMilliseconds(ModeSwitchPressTimeoutMilliseconds))
+        {
+            _pendingModeSwitchMode = null;
+            return false;
+        }
+
+        return true;
     }
 
     private void KeepExpandedAfterDrop()

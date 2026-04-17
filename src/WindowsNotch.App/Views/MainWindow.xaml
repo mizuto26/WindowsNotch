@@ -14,8 +14,8 @@
                 <Grid.RowDefinitions><RowDefinition Height="34" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <Grid Grid.Row="0">
                     <StackPanel x:Name="ModeSwitchPanel" Margin="26,4,0,0" HorizontalAlignment="Left" Orientation="Horizontal" Visibility="Collapsed">
-                        <Button x:Name="MusicModeButton" Margin="0,0,14,0" Click="MusicModeButton_Click" Style="{StaticResource NotchTopIconButtonStyle}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#F3F5F7" Text="&#xE189;" /></Button>
-                        <Button x:Name="FilesModeButton" Click="FilesModeButton_Click" Style="{StaticResource NotchTopIconButtonStyle}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="#F3F5F7" Text="&#xE91B;" /></Button>
+                        <Button x:Name="MusicModeButton" Margin="0,0,14,0" Click="MusicModeButton_Click" PreviewMouseLeftButtonDown="MusicModeButton_PreviewMouseLeftButtonDown" Style="{StaticResource NotchTopIconButtonStyle}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#F3F5F7" Text="&#xE189;" /></Button>
+                        <Button x:Name="FilesModeButton" Click="FilesModeButton_Click" PreviewMouseLeftButtonDown="FilesModeButton_PreviewMouseLeftButtonDown" Style="{StaticResource NotchTopIconButtonStyle}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="#F3F5F7" Text="&#xE91B;" /></Button>
                     </StackPanel>
                     <Button x:Name="SettingsButton" Margin="0,4,26,0" HorizontalAlignment="Right" VerticalAlignment="Top" Visibility="Collapsed" Click="SettingsButton_Click" Style="{StaticResource NotchTopIconButtonStyle}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#F3F5F7" Text="&#xE713;" /></Button>
                 </Grid>

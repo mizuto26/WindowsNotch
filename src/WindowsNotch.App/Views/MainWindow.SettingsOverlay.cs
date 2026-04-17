@@ -112,8 +112,18 @@ public partial class MainWindow
             return false;
         }
 
-        var foregroundWindowHandle = GetForegroundWindow();
+        var foregroundWindowHandle = GetRootWindowHandle(GetForegroundWindow());
         if (foregroundWindowHandle == IntPtr.Zero || foregroundWindowHandle == _windowHandle)
+        {
+            return false;
+        }
+
+        if (IsSameProcessWindow(foregroundWindowHandle))
+        {
+            return false;
+        }
+
+        if (IsIgnoredOverlayWindowClass(GetWindowClassName(foregroundWindowHandle)))
         {
             return false;
         }

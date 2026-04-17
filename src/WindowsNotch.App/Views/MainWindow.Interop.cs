@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Interop;
 
@@ -32,6 +33,9 @@ public partial class MainWindow
     private static extern IntPtr GetForegroundWindow();
 
     [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr hWnd, uint gaFlags);
+
+    [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsWindowVisible(IntPtr hWnd);
 
@@ -42,6 +46,12 @@ public partial class MainWindow
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetWindowRect(IntPtr hWnd, out NativeRect lpRect);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmGetWindowAttribute(
@@ -83,6 +93,7 @@ public partial class MainWindow
     private static readonly IntPtr HWND_TOPMOST = new(-1);
     private static readonly IntPtr HWND_NOTOPMOST = new(-2);
     private const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
+    private const uint GA_ROOT = 2;
     private const uint SWP_NOSIZE = 0x0001;
     private const uint SWP_NOMOVE = 0x0002;
     private const uint SWP_NOACTIVATE = 0x0010;
@@ -128,6 +139,46 @@ public partial class MainWindow
         }
 
         return GetWindowRect(windowHandle, out windowRect);
+    }
+
+    private static IntPtr GetRootWindowHandle(IntPtr windowHandle)
+    {
+        if (windowHandle == IntPtr.Zero)
+        {
+            return IntPtr.Zero;
+        }
+
+        var rootHandle = GetAncestor(windowHandle, GA_ROOT);
+        return rootHandle == IntPtr.Zero ? windowHandle : rootHandle;
+    }
+
+    private static string GetWindowClassName(IntPtr windowHandle)
+    {
+        if (windowHandle == IntPtr.Zero)
+        {
+            return string.Empty;
+        }
+
+        var className = new StringBuilder(256);
+        return GetClassName(windowHandle, className, className.Capacity) > 0
+            ? className.ToString()
+            : string.Empty;
+    }
+
+    private static bool IsSameProcessWindow(IntPtr windowHandle)
+    {
+        if (windowHandle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        GetWindowThreadProcessId(windowHandle, out var processId);
+        return processId == Environment.ProcessId;
+    }
+
+    private static bool IsIgnoredOverlayWindowClass(string className)
+    {
+        return className is "WorkerW" or "Progman" or "Shell_TrayWnd";
     }
 
     private static IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex)
