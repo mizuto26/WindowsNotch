@@ -4,3 +4,4 @@ obj/
 *.zip
 .dotnet/
 .nuget/
+tmp/

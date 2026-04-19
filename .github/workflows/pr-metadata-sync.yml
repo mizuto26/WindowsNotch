@@ -1,0 +1,99 @@
+name: PR Metadata Sync
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  sync-metadata:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Sync assignees and linked issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const branch = pr.head.ref || "";
+            const author = pr.user?.login;
+            const currentBody = pr.body || "";
+            const issueMarkerStart = "<!-- codex:auto-issue-link:start -->";
+            const issueMarkerEnd = "<!-- codex:auto-issue-link:end -->";
+            const issueMarkerPattern = /<!-- codex:auto-issue-link:start -->[\s\S]*?<!-- codex:auto-issue-link:end -->\n*/m;
+            const signatureMarkerStart = "<!-- codex:auto-signature:start -->";
+            const signatureMarkerEnd = "<!-- codex:auto-signature:end -->";
+            const signatureMarkerPattern = /<!-- codex:auto-signature:start -->[\s\S]*?<!-- codex:auto-signature:end -->\n*/m;
+            const signatureBlock = `${signatureMarkerStart}\nGenerated with Codex\n${signatureMarkerEnd}`;
+
+            if (author) {
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                assignees: [author],
+              }).catch(() => {});
+            }
+
+            let nextBody = currentBody;
+            const branchMatch = branch.match(/^(feat|fix|refactor|docs|style|test|build|ci|chore|perf|revert)\/(\d+)-/);
+            if (!branchMatch) {
+              core.info("No issue number found in branch name. Skipping issue linkage.");
+            } else {
+              const issueNumber = Number(branchMatch[2]);
+              const linkBlock = `${issueMarkerStart}\nCloses #${issueNumber}\n${issueMarkerEnd}`;
+
+              try {
+                await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                });
+
+                if (author) {
+                  await github.rest.issues.addAssignees({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issueNumber,
+                    assignees: [author],
+                  }).catch(() => {});
+                }
+
+                if (issueMarkerPattern.test(nextBody)) {
+                  nextBody = nextBody.replace(issueMarkerPattern, `${linkBlock}\n\n`);
+                } else if (/\b(close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#\d+\b/i.test(nextBody)) {
+                  core.info("PR body already has an issue closing keyword. Skipping issue body insertion.");
+                } else if (nextBody.trim().length === 0) {
+                  nextBody = linkBlock;
+                } else {
+                  nextBody = `${linkBlock}\n\n${nextBody}`;
+                }
+              } catch (error) {
+                core.info(`Issue #${issueNumber} was not found. Skipping issue linkage.`);
+              }
+            }
+
+            if (signatureMarkerPattern.test(nextBody)) {
+              nextBody = nextBody.replace(signatureMarkerPattern, `${signatureBlock}\n`);
+            } else if (!/Generated with Codex/i.test(nextBody)) {
+              nextBody = nextBody.trim().length === 0
+                ? signatureBlock
+                : `${nextBody.trimEnd()}\n\n${signatureBlock}`;
+            }
+
+            if (nextBody !== currentBody) {
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                body: nextBody,
+              });
+            }

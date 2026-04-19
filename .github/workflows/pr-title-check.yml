@@ -17,8 +17,11 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
+          pattern='^(feat|fix|refactor|docs|style|test|build|ci|chore|perf|revert)(\([^)]+\))?!?: .+$'
+
           echo "PR title: $PR_TITLE"
-          if [[ ! "$PR_TITLE" =~ ^(feat|fix|refactor|docs|style|test|build|ci|chore|perf|revert)(\([^)]+\))?!?:\ .+ ]]; then
+
+          if ! printf '%s\n' "$PR_TITLE" | grep -Eq "$pattern"; then
             echo "PR title must use conventional commit format."
             echo "Examples:"
             echo "  feat: add iCloud share confirmation state"

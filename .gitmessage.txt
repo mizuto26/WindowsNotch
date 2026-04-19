@@ -1,0 +1,9 @@
+# Use conventional commit format on the first line.
+# Example:
+# feat: add music tab switching
+#
+# Optional body bullets:
+# - change 1
+# - change 2
+
+Generated with Codex
