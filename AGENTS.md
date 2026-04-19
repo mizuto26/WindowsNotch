@@ -135,7 +135,9 @@ Use the local .NET install:
 
 - PR title should follow the same conventional format as commits.
 - PR body should stay concise and easy to scan.
+- Include the related issue in the PR body with `Closes #<issue-number>` when working from an issue.
 - Prefer this structure:
+  - `Related`
   - `Summary`
   - `Testing`
   - `UI Notes`
@@ -145,6 +147,7 @@ Use the local .NET install:
 - Keep PRs focused on one main purpose.
 - If a change affects notch animation, overlay mode, or drag behavior, call that out explicitly in the PR body.
 - PR labels are automatically derived from the conventional type when possible.
+- PR assignees and issue linkage are synchronized automatically from the PR author and branch issue number when possible.
 - Keep branch name, PR title, and main commit type aligned.
 
 ## GitHub Protection Expectations
