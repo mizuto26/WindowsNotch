@@ -152,6 +152,21 @@ Use the local .NET install:
 - PR assignees and issue linkage are synchronized automatically from the PR author and branch issue number when possible.
 - Keep branch name, PR title, and main commit type aligned.
 
+## Issue Rules
+
+- Prefer using the GitHub issue templates instead of blank issues.
+- Use conventional prefixes in issue titles when practical:
+  - `feat:`
+  - `fix:`
+  - `docs:`
+  - `ci:`
+  - `chore:`
+- Issue creator should be the default assignee when possible.
+- Issue labels should be synchronized automatically:
+  - matching conventional titles get `type: ...`
+  - otherwise they fall back to `needs-triage`
+- Include `Generated with Codex` in the issue body attribution section when Codex materially helped draft the issue.
+
 ## GitHub Protection Expectations
 
 - `main` should be protected in GitHub settings.

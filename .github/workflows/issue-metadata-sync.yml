@@ -1,0 +1,99 @@
+name: Issue Metadata Sync
+
+on:
+  issues:
+    types:
+      - opened
+      - edited
+      - reopened
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync-metadata:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Sync assignees and labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const author = issue.user?.login;
+            const title = issue.title || "";
+
+            if (author) {
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                assignees: [author],
+              }).catch(() => {});
+            }
+
+            const titleMatch = title.match(/^(feat|fix|refactor|docs|style|test|build|ci|chore|perf|revert)(\([^)]+\))?!?:\s.+$/);
+            const targetLabel = titleMatch ? `type: ${titleMatch[1]}` : "needs-triage";
+            const labelConfig = {
+              "type: feat": { color: "1D76DB", description: "New feature" },
+              "type: fix": { color: "D73A4A", description: "Bug fix" },
+              "type: refactor": { color: "8A63D2", description: "Code refactor" },
+              "type: docs": { color: "0E8A16", description: "Documentation" },
+              "type: style": { color: "C5DEF5", description: "Style only" },
+              "type: test": { color: "FBCA04", description: "Tests" },
+              "type: build": { color: "5319E7", description: "Build system" },
+              "type: ci": { color: "1B1F23", description: "CI workflow" },
+              "type: chore": { color: "BFDADC", description: "Maintenance work" },
+              "type: perf": { color: "F9D0C4", description: "Performance" },
+              "type: revert": { color: "E99695", description: "Revert" },
+              "needs-triage": { color: "D4C5F9", description: "Needs label triage" },
+            };
+
+            const managedLabels = Object.keys(labelConfig);
+            const existingLabels = await github.paginate(
+              github.rest.issues.listLabelsOnIssue,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                per_page: 100,
+              }
+            );
+
+            for (const label of existingLabels) {
+              if (managedLabels.includes(label.name) && label.name !== targetLabel) {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  name: label.name,
+                }).catch(() => {});
+              }
+            }
+
+            try {
+              await github.rest.issues.getLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: targetLabel,
+              });
+            } catch (error) {
+              const config = labelConfig[targetLabel];
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: targetLabel,
+                color: config.color,
+                description: config.description,
+              });
+            }
+
+            if (!existingLabels.some(label => label.name === targetLabel)) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: [targetLabel],
+              });
+            }
