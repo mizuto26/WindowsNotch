@@ -1,0 +1,32 @@
+name: Branch Name Check
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+jobs:
+  branch-name-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate branch name
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: |
+          echo "Branch name: $BRANCH_NAME"
+          if [[ "$BRANCH_NAME" =~ ^dependabot/ ]]; then
+            exit 0
+          fi
+
+          if [[ ! "$BRANCH_NAME" =~ ^(feat|fix|refactor|docs|style|test|build|ci|chore|perf|revert)/[0-9]+-[a-z0-9._-]+$ ]]; then
+            echo "Branch name must match:"
+            echo "  type/issue-number-short-summary"
+            echo "Examples:"
+            echo "  feat/123-music-tab"
+            echo "  fix/456-not-dimming-on-desktop-click"
+            exit 1
+          fi

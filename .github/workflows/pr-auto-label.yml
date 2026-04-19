@@ -1,0 +1,100 @@
+name: PR Auto Label
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  auto-label:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Apply labels from PR title or branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const title = pr.title || "";
+            const branch = pr.head.ref || "";
+
+            const typeMatch =
+              title.match(/^(feat|fix|refactor|docs|style|test|build|ci|chore|perf|revert)(\([^)]+\))?!?:\s.+$/) ||
+              branch.match(/^(feat|fix|refactor|docs|style|test|build|ci|chore|perf|revert)\//);
+
+            if (!typeMatch) {
+              core.info("No conventional type detected. Skipping auto-label.");
+              return;
+            }
+
+            const type = typeMatch[1];
+            const labelName = `type: ${type}`;
+            const labelConfig = {
+              feat: { color: "1D76DB", description: "New feature" },
+              fix: { color: "D73A4A", description: "Bug fix" },
+              refactor: { color: "8A63D2", description: "Code refactor" },
+              docs: { color: "0E8A16", description: "Documentation" },
+              style: { color: "C5DEF5", description: "Style only" },
+              test: { color: "FBCA04", description: "Tests" },
+              build: { color: "5319E7", description: "Build system" },
+              ci: { color: "1B1F23", description: "CI workflow" },
+              chore: { color: "BFDADC", description: "Maintenance work" },
+              perf: { color: "F9D0C4", description: "Performance" },
+              revert: { color: "E99695", description: "Revert" },
+            };
+
+            const existingLabels = await github.paginate(
+              github.rest.issues.listLabelsOnIssue,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                per_page: 100,
+              }
+            );
+
+            const managedLabelNames = Object.keys(labelConfig).map(key => `type: ${key}`);
+
+            for (const label of existingLabels) {
+              if (managedLabelNames.includes(label.name) && label.name !== labelName) {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  name: label.name,
+                }).catch(() => {});
+              }
+            }
+
+            const config = labelConfig[type];
+
+            try {
+              await github.rest.issues.getLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: labelName,
+              });
+            } catch (error) {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: labelName,
+                color: config.color,
+                description: config.description,
+              });
+            }
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels: [labelName],
+            });
