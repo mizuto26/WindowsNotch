@@ -1,0 +1,37 @@
+name: Release Package
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-attach:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build release zip
+        id: package
+        shell: pwsh
+        run: ./scripts/package-release.ps1 -DotnetCommand dotnet
+
+      - name: Upload zip to GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: WindowsNotch-win-x64.zip
+          overwrite_files: true
+          fail_on_unmatched_files: true
