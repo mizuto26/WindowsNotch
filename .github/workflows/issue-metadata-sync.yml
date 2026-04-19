@@ -16,13 +16,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Sync assignees and labels
+      - name: Sync assignees, labels, and issue comment
         uses: actions/github-script@v7
         with:
           script: |
             const issue = context.payload.issue;
             const author = issue.user?.login;
             const title = issue.title || "";
+            const commentMarker = "<!-- codex:auto-issue-guide -->";
 
             if (author) {
               await github.rest.issues.addAssignees({
@@ -95,5 +96,47 @@ jobs:
                 repo: context.repo.repo,
                 issue_number: issue.number,
                 labels: [targetLabel],
+              });
+            }
+
+            const issueCommentBody = `${commentMarker}
+            Thanks. Issue metadata was synced automatically.
+
+            - Assignee sync: ${author ? `\`${author}\`` : "skipped"}
+            - Label sync: \`${targetLabel}\`
+            - Attribution: keep \`Generated with Codex\` when Codex materially helped draft the issue
+
+            Next step:
+            ${targetLabel === "needs-triage"
+              ? "- rename the title with a conventional prefix like `feat:` or `fix:` to replace `needs-triage` automatically"
+              : "- continue working from this issue and create a matching branch with the issue number"}`.replace(/^ {12}/gm, "").trim();
+
+            const existingComments = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                per_page: 100,
+              }
+            );
+
+            const existingComment = existingComments.find(comment =>
+              typeof comment.body === "string" && comment.body.includes(commentMarker)
+            );
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: issueCommentBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: issueCommentBody,
               });
             }

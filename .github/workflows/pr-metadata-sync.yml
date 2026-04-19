@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Sync assignees and linked issue
+      - name: Sync assignees, linked issue, and PR comment
         uses: actions/github-script@v7
         with:
           script: |
@@ -26,6 +26,7 @@ jobs:
             const branch = pr.head.ref || "";
             const author = pr.user?.login;
             const currentBody = pr.body || "";
+            const commentMarker = "<!-- codex:auto-pr-guide -->";
             const issueMarkerStart = "<!-- codex:auto-issue-link:start -->";
             const issueMarkerEnd = "<!-- codex:auto-issue-link:end -->";
             const issueMarkerPattern = /<!-- codex:auto-issue-link:start -->[\s\S]*?<!-- codex:auto-issue-link:end -->\n*/m;
@@ -95,5 +96,50 @@ jobs:
                 repo: context.repo.repo,
                 pull_number: pr.number,
                 body: nextBody,
+              });
+            }
+
+            const issueLinkNote = branchMatch
+              ? `- Related issue sync: branch issue number \`${branchMatch[2]}\` was checked`
+              : "- Related issue sync: no issue number was found in the branch name";
+
+            const prCommentBody = `${commentMarker}
+            Thanks. PR metadata was synced automatically.
+
+            - Assignee sync: ${author ? `\`${author}\`` : "skipped"}
+            ${issueLinkNote}
+            - Labels: synced separately from the PR title / branch convention
+            - Auto-merge: when required checks pass and the PR is ready, Codex will squash-merge it
+
+            Next step:
+            - move the PR out of draft when you want auto-merge to be allowed`.replace(/^ {12}/gm, "").trim();
+
+            const existingComments = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                per_page: 100,
+              }
+            );
+
+            const existingComment = existingComments.find(comment =>
+              typeof comment.body === "string" && comment.body.includes(commentMarker)
+            );
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: prCommentBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: prCommentBody,
               });
             }

@@ -178,6 +178,16 @@ Use the local .NET install:
   - `PR Title Check`
   - `Branch Name Check`
 
+## GitHub Automation
+
+- PR metadata sync should keep assignees, linked issues, and attribution updated.
+- Issue metadata sync should keep assignees, labels, and attribution updated.
+- PR / Issue guide comments should be updated in-place instead of spamming new comments.
+- PR CI automation should:
+  - post a short CI status comment
+  - auto squash-merge eligible PRs to the default branch after required checks pass
+- Merged PR branches should be deleted automatically when safe.
+
 ## When Editing
 
 - Check whether a change affects:
