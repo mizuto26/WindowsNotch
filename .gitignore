@@ -1,7 +1,13 @@
 .vscode/
+.vs/
 bin/
 obj/
 *.zip
+*.log
+*.user
+*.suo
 .dotnet/
 .nuget/
 tmp/
+TestResults/
+artifacts/
