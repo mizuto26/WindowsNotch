@@ -129,6 +129,7 @@ Use the local .NET install:
   - `feat(media): add progress slider drag seek`
   - `refactor: remove unused drag preview code`
 - After the subject, prefer a short bullet list in the body when multiple changes are included.
+- Include `Generated with Codex` in the commit body when Codex materially helped produce the change.
 - Do not mix unrelated changes into one commit.
 
 ## Pull Request Rules
@@ -144,6 +145,7 @@ Use the local .NET install:
 - In `Summary`, explain the user-visible change first.
 - In `Testing`, explicitly say what was run, or say `Not run` if nothing was run.
 - In `UI Notes`, mention animation, hover, overlay, drag-and-drop, or media behavior when affected.
+- Include `Generated with Codex` in the PR body attribution section.
 - Keep PRs focused on one main purpose.
 - If a change affects notch animation, overlay mode, or drag behavior, call that out explicitly in the PR body.
 - PR labels are automatically derived from the conventional type when possible.
