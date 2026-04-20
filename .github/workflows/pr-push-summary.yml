@@ -1,0 +1,122 @@
+name: PR Push Summary
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  summarize-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Update PR push summary comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = context.ref.replace("refs/heads/", "");
+            const marker = "<!-- codex:auto-push-summary -->";
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const { data: pulls } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: "open",
+              head: `${owner}:${branch}`,
+              per_page: 10,
+            });
+
+            if (pulls.length === 0) {
+              core.info(`No open PR found for branch ${branch}.`);
+              return;
+            }
+
+            const pr = pulls[0];
+            const afterSha = context.payload.after;
+            const beforeSha = context.payload.before;
+            const commits = context.payload.commits || [];
+
+            async function upsertComment(issueNumber, body) {
+              const comments = await github.paginate(
+                github.rest.issues.listComments,
+                {
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  per_page: 100,
+                }
+              );
+
+              const existingComment = comments.find(comment =>
+                typeof comment.body === "string" && comment.body.includes(marker)
+              );
+
+              if (existingComment) {
+                await github.rest.issues.updateComment({
+                  owner,
+                  repo,
+                  comment_id: existingComment.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  body,
+                });
+              }
+            }
+
+            let changedFiles = [];
+            const isNewBranchPush = /^0+$/.test(beforeSha || "");
+
+            if (!isNewBranchPush && beforeSha && afterSha) {
+              try {
+                const { data: comparison } = await github.rest.repos.compareCommits({
+                  owner,
+                  repo,
+                  base: beforeSha,
+                  head: afterSha,
+                });
+
+                changedFiles = (comparison.files || []).map(file => file.filename);
+              } catch (error) {
+                core.info(`Could not compare commits for push summary: ${error.message}`);
+              }
+            }
+
+            const commitLines = commits.length === 0
+              ? ["- no commit details were available in the push payload"]
+              : commits.slice(-10).map(commit => {
+                  const shortSha = commit.id.slice(0, 7);
+                  const firstLine = (commit.message || "").split("\n")[0];
+                  return `- \`${shortSha}\` ${firstLine}`;
+                });
+
+            const fileLines = changedFiles.length === 0
+              ? ["- file list unavailable for this push"]
+              : changedFiles.slice(0, 12).map(file => `- \`${file}\``);
+
+            const extraFileCount = changedFiles.length > 12
+              ? `\n- and ${changedFiles.length - 12} more file(s)`
+              : "";
+
+            const body = `${marker}
+            ## Push Summary
+
+            New commits were pushed to \`${branch}\`.
+
+            ### Commits
+            ${commitLines.join("\n")}
+
+            ### Changed Files
+            ${fileLines.join("\n")}${extraFileCount}`.replace(/^ {12}/gm, "").trim();
+
+            await upsertComment(pr.number, body);
