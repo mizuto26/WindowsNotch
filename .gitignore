@@ -11,3 +11,9 @@ obj/
 tmp/
 TestResults/
 artifacts/
+publish/
+skills/
+.idea/
+.fleet/
+.history/
+.DS_Store
