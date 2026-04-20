@@ -182,11 +182,11 @@ Use the local .NET install:
 
 - PR metadata sync should keep assignees, linked issues, and attribution updated.
 - Issue metadata sync should keep assignees, labels, and attribution updated.
-- PR / Issue guide comments should be updated in-place instead of spamming new comments.
+- PR push summary comments should update in-place when new commits are pushed to an open PR branch.
 - PR CI automation should:
   - post a short CI status comment
   - auto squash-merge eligible PRs to the default branch after required checks pass
-- Merged PR branches should be deleted automatically when safe.
+- Prefer GitHub's built-in `Automatically delete head branches` repository setting for branch cleanup after merge.
 
 ## When Editing
 
