@@ -36,8 +36,11 @@ public partial class MainWindow : Window
     private const double HiddenRevealHeight = 0;
     private const double HotZoneHeight = 6;
     private const double HotZoneHalfWidth = 188;
-    private const int ExpandAnimationMilliseconds = 280;
-    private const int CollapseAnimationMilliseconds = 240;
+    private const int PreviewAnimationMilliseconds = 190;
+    private const int ExpandAnimationMilliseconds = 260;
+    private const int CollapseAnimationMilliseconds = 230;
+    private const int ExpandedContentEnterAnimationMilliseconds = 220;
+    private const int ExpandedContentExitAnimationMilliseconds = 170;
     private const int HoverPollMilliseconds = 16;
     private const int PreviewExpandDelayMilliseconds = 220;
     private const int CollapseDelayMilliseconds = 180;
@@ -95,6 +98,7 @@ public partial class MainWindow : Window
 
     private bool IsExpanded => _expansionStage == NotchExpansionStage.Expanded;
     private bool IsPresented => _expansionStage != NotchExpansionStage.Collapsed;
+    private bool ShouldShowExpandedChrome => IsExpanded || _isCollapseAnimationActive;
 
     public MainWindow()
     {
@@ -285,6 +289,7 @@ public partial class MainWindow : Window
     private void UpdateExpandedModePresentation()
     {
         var isFilesMode = _expandedMode == ExpandedMode.Files;
+        var showExpandedChrome = ShouldShowExpandedChrome;
 
         if (FilesView is not null)
         {
@@ -298,7 +303,7 @@ public partial class MainWindow : Window
 
         if (ModeSwitchPanel is not null)
         {
-            ModeSwitchPanel.Visibility = IsExpanded ? Visibility.Visible : Visibility.Collapsed;
+            ModeSwitchPanel.Visibility = showExpandedChrome ? Visibility.Visible : Visibility.Collapsed;
         }
 
         if (FilesModeButton is not null)
