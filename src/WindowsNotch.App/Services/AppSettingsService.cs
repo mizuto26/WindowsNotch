@@ -6,6 +6,11 @@ namespace WindowsNotch.App.Services;
 
 public sealed class AppSettingsService
 {
+    private static readonly JsonSerializerOptions JsonSerializerOptions = new()
+    {
+        WriteIndented = true,
+    };
+
     public AppSettings Load()
     {
         try
@@ -30,14 +35,21 @@ public sealed class AppSettingsService
             ?? throw new InvalidOperationException("Settings directory could not be resolved.");
 
         Directory.CreateDirectory(settingsDirectory);
+        var temporaryFilePath = Path.Combine(settingsDirectory, $"{Path.GetFileName(AppPaths.SettingsFilePath)}.tmp");
 
-        var json = JsonSerializer.Serialize(
-            settings,
-            new JsonSerializerOptions
+        var json = JsonSerializer.Serialize(settings, JsonSerializerOptions);
+
+        try
+        {
+            File.WriteAllText(temporaryFilePath, json);
+            File.Move(temporaryFilePath, AppPaths.SettingsFilePath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryFilePath))
             {
-                WriteIndented = true,
-            });
-
-        File.WriteAllText(AppPaths.SettingsFilePath, json);
+                File.Delete(temporaryFilePath);
+            }
+        }
     }
 }

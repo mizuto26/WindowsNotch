@@ -67,7 +67,7 @@ public partial class MainWindow
 
     private void RefreshOverlayModeForCurrentState(bool immediateTopUpdate = false)
     {
-        RefreshOverlayMode(isInteractive: false, immediateTopUpdate);
+        RefreshOverlayMode(GetCurrentOverlayInteractivity(), immediateTopUpdate);
     }
 
     private void RefreshOverlayMode(bool isInteractive, bool immediateTopUpdate = false)
@@ -274,5 +274,18 @@ public partial class MainWindow
         }
 
         SetCurrentValue(TopProperty, top);
+    }
+
+    private bool GetCurrentOverlayInteractivity()
+    {
+        if (_isDragOver || _isShareDropTargetActive || _isShelfDropTargetActive || _isWaitingForPostDropExit)
+        {
+            return true;
+        }
+
+        var cursorPoint = GetCursorPositionInDeviceIndependentPixels();
+        return IsCursorInHotZone(cursorPoint) ||
+               (!_isCollapseAnimationActive && IsCursorOverNotchBody(cursorPoint)) ||
+               (IsExpanded && !_isCollapseAnimationActive && IsCursorOverExpandedWindow(cursorPoint));
     }
 }

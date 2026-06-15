@@ -12,7 +12,8 @@ public sealed class StartupRegistrationService
     {
         using var runKey = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: false);
         var registeredValue = runKey?.GetValue(AppValueName) as string;
-        return !string.IsNullOrWhiteSpace(registeredValue);
+        return !string.IsNullOrWhiteSpace(registeredValue) &&
+               string.Equals(registeredValue, BuildStartupValue(), StringComparison.OrdinalIgnoreCase);
     }
 
     public void SetEnabled(bool enabled)
@@ -26,12 +27,17 @@ public sealed class StartupRegistrationService
             return;
         }
 
+        runKey.SetValue(AppValueName, BuildStartupValue(), RegistryValueKind.String);
+    }
+
+    private static string BuildStartupValue()
+    {
         var executablePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName;
         if (string.IsNullOrWhiteSpace(executablePath))
         {
             throw new InvalidOperationException("The current executable path could not be resolved.");
         }
 
-        runKey.SetValue(AppValueName, $"\"{executablePath}\"");
+        return $"\"{executablePath}\"";
     }
 }

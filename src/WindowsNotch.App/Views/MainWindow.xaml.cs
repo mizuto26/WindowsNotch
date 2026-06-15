@@ -49,6 +49,13 @@ public partial class MainWindow : Window
     private const int ModeSwitchPressTimeoutMilliseconds = 600;
     private const double PreviewScaleProgress = 0.12;
     private const double PreviewHeightMultiplier = 1.08;
+    private static readonly Brush ShareStatusIdleBackgroundBrush = CreateFrozenBrush(Color.FromArgb(18, 255, 255, 255));
+    private static readonly Brush ShareStatusSuccessBackgroundBrush = CreateFrozenBrush(Color.FromArgb(255, 170, 235, 120));
+    private static readonly Brush ShareStatusSuccessForegroundBrush = CreateFrozenBrush(Color.FromArgb(255, 22, 51, 0));
+    private static readonly Brush DropZoneIdleBackgroundBrush = CreateFrozenBrush(Color.FromArgb(255, 0, 0, 0));
+    private static readonly Brush DropZoneActiveBackgroundBrush = CreateFrozenBrush(Color.FromArgb(54, 72, 137, 255));
+    private static readonly Brush DropZoneActiveBorderBrush = CreateFrozenBrush(Color.FromArgb(120, 126, 184, 255));
+    private static readonly Brush ShelfPanelActiveBorderBrush = CreateFrozenBrush(Color.FromArgb(90, 102, 209, 255));
 
     private readonly DispatcherTimer _hoverTimer;
     private readonly DispatcherTimer _topmostTimer;
@@ -127,6 +134,7 @@ public partial class MainWindow : Window
         _collapseAnimationTimer.Tick += CollapseAnimationTimer_Tick;
         _shareStatusResetTimer.Tick += ShareStatusResetTimer_Tick;
         SourceInitialized += Window_SourceInitialized;
+        Closed += Window_Closed;
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -136,7 +144,7 @@ public partial class MainWindow : Window
         ApplyImmediateNotchScale(GetCollapsedScaleX(), 1.0);
         UpdateExpandedModePresentation();
 
-        LoadShelfItems();
+        await LoadShelfItemsAsync();
         UpdateDropZoneVisuals();
         PositionWindow();
         SetShareStatusIdle();
@@ -250,7 +258,7 @@ public partial class MainWindow : Window
     private void SetShareStatusIdle()
     {
         _shareStatusResetTimer.Stop();
-        ShareStatusBadge.Background = new SolidColorBrush(Color.FromArgb(18, 255, 255, 255));
+        ShareStatusBadge.Background = ShareStatusIdleBackgroundBrush;
         ShareCloudIcon.Visibility = Visibility.Visible;
         ShareSuccessIcon.Visibility = Visibility.Collapsed;
         ShareStatusText.Text = "iCloud Drive";
@@ -259,11 +267,11 @@ public partial class MainWindow : Window
 
     private void SetShareStatusSuccess()
     {
-        ShareStatusBadge.Background = new SolidColorBrush(Color.FromArgb(255, 170, 235, 120));
+        ShareStatusBadge.Background = ShareStatusSuccessBackgroundBrush;
         ShareCloudIcon.Visibility = Visibility.Collapsed;
         ShareSuccessIcon.Visibility = Visibility.Visible;
         ShareStatusText.Text = "Added";
-        ShareStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 185, 255, 150));
+        ShareStatusText.Foreground = ShareStatusSuccessForegroundBrush;
         _shareStatusResetTimer.Stop();
         _shareStatusResetTimer.Start();
     }
@@ -304,5 +312,39 @@ public partial class MainWindow : Window
             MusicModeButton.Opacity = isFilesMode ? 0.52 : 1.0;
             MusicModeButton.IsHitTestVisible = isFilesMode;
         }
+    }
+
+    private async Task LoadShelfItemsAsync()
+    {
+        var items = await Task.Run(_shelfService.LoadItems);
+        ReplaceShelfItems(items);
+    }
+
+    private void Window_Closed(object? sender, EventArgs e)
+    {
+        SourceInitialized -= Window_SourceInitialized;
+        Closed -= Window_Closed;
+
+        _hoverTimer.Stop();
+        _topmostTimer.Stop();
+        _collapseAnimationTimer.Stop();
+        _shareStatusResetTimer.Stop();
+        _musicProgressTimer.Stop();
+
+        _hoverTimer.Tick -= HoverTimer_Tick;
+        _topmostTimer.Tick -= TopmostTimer_Tick;
+        _collapseAnimationTimer.Tick -= CollapseAnimationTimer_Tick;
+        _shareStatusResetTimer.Tick -= ShareStatusResetTimer_Tick;
+        _musicProgressTimer.Tick -= MusicProgressTimer_Tick;
+
+        _mediaSessionService.StateChanged -= MediaSessionService_StateChanged;
+        _mediaSessionService.Dispose();
+    }
+
+    private static SolidColorBrush CreateFrozenBrush(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
     }
 }

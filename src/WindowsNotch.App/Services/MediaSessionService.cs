@@ -1,4 +1,5 @@
 using System.IO;
+using System.Threading;
 using Windows.Media.Control;
 using Windows.Storage.Streams;
 using WindowsNotch.App.Models;
@@ -7,23 +8,35 @@ namespace WindowsNotch.App.Services;
 
 public sealed class MediaSessionService : IDisposable
 {
+    private readonly SemaphoreSlim _publishStateLock = new(1, 1);
     private GlobalSystemMediaTransportControlsSessionManager? _manager;
     private GlobalSystemMediaTransportControlsSession? _currentSession;
+    private int _publishStateVersion;
+    private bool _isDisposed;
 
     public event EventHandler<NowPlayingState>? StateChanged;
 
     public async Task InitializeAsync()
     {
+        ThrowIfDisposed();
+
+        if (_manager is not null)
+        {
+            return;
+        }
+
         _manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
         _manager.CurrentSessionChanged += Manager_CurrentSessionChanged;
         _manager.SessionsChanged += Manager_SessionsChanged;
 
-        AttachToSession(_manager.GetCurrentSession() ?? _manager.GetSessions().FirstOrDefault());
+        AttachToSession(GetCurrentOrFirstSession(_manager));
         await PublishStateAsync();
     }
 
     public async Task TogglePlayPauseAsync()
     {
+        ThrowIfDisposed();
+
         if (_currentSession is null)
         {
             return;
@@ -35,6 +48,8 @@ public sealed class MediaSessionService : IDisposable
 
     public async Task SkipNextAsync()
     {
+        ThrowIfDisposed();
+
         if (_currentSession is null)
         {
             return;
@@ -46,6 +61,8 @@ public sealed class MediaSessionService : IDisposable
 
     public async Task SkipPreviousAsync()
     {
+        ThrowIfDisposed();
+
         if (_currentSession is null)
         {
             return;
@@ -57,6 +74,8 @@ public sealed class MediaSessionService : IDisposable
 
     public async Task SeekAsync(TimeSpan position)
     {
+        ThrowIfDisposed();
+
         if (_currentSession is null)
         {
             return;
@@ -68,11 +87,12 @@ public sealed class MediaSessionService : IDisposable
         }
 
         await _currentSession.TryChangePlaybackPositionAsync(position.Ticks);
+        await PublishStateAsync();
     }
 
     private async void Manager_CurrentSessionChanged(GlobalSystemMediaTransportControlsSessionManager sender, CurrentSessionChangedEventArgs args)
     {
-        AttachToSession(sender.GetCurrentSession() ?? sender.GetSessions().FirstOrDefault());
+        AttachToSession(GetCurrentOrFirstSession(sender));
         await PublishStateAsync();
     }
 
@@ -80,7 +100,7 @@ public sealed class MediaSessionService : IDisposable
     {
         if (_currentSession is null || !sender.GetSessions().Contains(_currentSession))
         {
-            AttachToSession(sender.GetCurrentSession() ?? sender.GetSessions().FirstOrDefault());
+            AttachToSession(GetCurrentOrFirstSession(sender));
         }
 
         await PublishStateAsync();
@@ -103,6 +123,8 @@ public sealed class MediaSessionService : IDisposable
 
     private void AttachToSession(GlobalSystemMediaTransportControlsSession? session)
     {
+        ThrowIfDisposed();
+
         if (_currentSession is not null)
         {
             _currentSession.MediaPropertiesChanged -= CurrentSession_MediaPropertiesChanged;
@@ -122,30 +144,71 @@ public sealed class MediaSessionService : IDisposable
 
     private async Task PublishStateAsync()
     {
-        var state = await BuildStateAsync();
-        StateChanged?.Invoke(this, state);
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        var publishVersion = Interlocked.Increment(ref _publishStateVersion);
+        var lockTaken = false;
+
+        try
+        {
+            await _publishStateLock.WaitAsync();
+            lockTaken = true;
+
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            var state = await BuildStateAsync();
+            if (_isDisposed || publishVersion != Volatile.Read(ref _publishStateVersion))
+            {
+                return;
+            }
+
+            StateChanged?.Invoke(this, state);
+        }
+        catch
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            StateChanged?.Invoke(this, new NowPlayingState());
+        }
+        finally
+        {
+            if (lockTaken)
+            {
+                _publishStateLock.Release();
+            }
+        }
     }
 
     private async Task<NowPlayingState> BuildStateAsync()
     {
-        if (_currentSession is null)
+        var currentSession = _currentSession;
+        if (currentSession is null)
         {
             return new NowPlayingState();
         }
 
-        GlobalSystemMediaTransportControlsSessionMediaProperties? mediaProperties = null;
+        GlobalSystemMediaTransportControlsSessionMediaProperties? mediaProperties;
 
         try
         {
-            mediaProperties = await _currentSession.TryGetMediaPropertiesAsync();
+            mediaProperties = await currentSession.TryGetMediaPropertiesAsync();
         }
         catch
         {
             mediaProperties = null;
         }
 
-        var playbackInfo = _currentSession.GetPlaybackInfo();
-        var timeline = _currentSession.GetTimelineProperties();
+        var playbackInfo = currentSession.GetPlaybackInfo();
+        var timeline = currentSession.GetTimelineProperties();
         var controls = playbackInfo?.Controls;
         var title = mediaProperties?.Title;
         var artist = mediaProperties?.Artist;
@@ -164,7 +227,7 @@ public sealed class MediaSessionService : IDisposable
             Position = position,
             Duration = duration,
             CapturedAtUtc = DateTime.UtcNow,
-            SourceAppId = _currentSession.SourceAppUserModelId ?? string.Empty,
+            SourceAppId = currentSession.SourceAppUserModelId ?? string.Empty,
             ArtworkBytes = await LoadArtworkBytesAsync(mediaProperties?.Thumbnail),
         };
     }
@@ -193,6 +256,13 @@ public sealed class MediaSessionService : IDisposable
 
     public void Dispose()
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        _isDisposed = true;
+
         if (_currentSession is not null)
         {
             _currentSession.MediaPropertiesChanged -= CurrentSession_MediaPropertiesChanged;
@@ -205,5 +275,26 @@ public sealed class MediaSessionService : IDisposable
             _manager.CurrentSessionChanged -= Manager_CurrentSessionChanged;
             _manager.SessionsChanged -= Manager_SessionsChanged;
         }
+
+        _currentSession = null;
+        _manager = null;
+        _publishStateLock.Dispose();
+    }
+
+    private static GlobalSystemMediaTransportControlsSession? GetCurrentOrFirstSession(GlobalSystemMediaTransportControlsSessionManager manager)
+    {
+        var currentSession = manager.GetCurrentSession();
+        if (currentSession is not null)
+        {
+            return currentSession;
+        }
+
+        var sessions = manager.GetSessions();
+        return sessions.Count > 0 ? sessions[0] : null;
+    }
+
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
     }
 }

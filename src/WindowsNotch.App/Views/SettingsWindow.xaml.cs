@@ -3,6 +3,8 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Media3D;
+using System.Windows.Controls.Primitives;
 using WindowsNotch.App.Models;
 using WindowsNotch.App.Services;
 
@@ -19,7 +21,7 @@ public partial class SettingsWindow : Window
 
         _iCloudDriveLocator = iCloudDriveLocator;
         LaunchAtStartupCheckBox.IsChecked = settings.LaunchAtStartup;
-        UpdateWindowClip();
+        Loaded += Window_Loaded;
     }
 
     public bool ShouldExitAfterClose { get; private set; }
@@ -46,24 +48,31 @@ public partial class SettingsWindow : Window
 
     private void OpenICloudFolderButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!_iCloudDriveLocator.TryResolveWindowsNotchFolder(out var folderPath))
+        try
         {
-            MessageBox.Show(
-                this,
-                "iCloud Drive was not found. Turn it on in iCloud for Windows first.",
-                "WindowsNotch",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            return;
+            if (!_iCloudDriveLocator.TryResolveWindowsNotchFolder(out var folderPath))
+            {
+                MessageBox.Show(
+                    this,
+                    "iCloud Drive was not found. Turn it on in iCloud for Windows first.",
+                    "WindowsNotch",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            Directory.CreateDirectory(folderPath);
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = folderPath,
+                UseShellExecute = true,
+            });
         }
-
-        Directory.CreateDirectory(folderPath);
-
-        Process.Start(new ProcessStartInfo
+        catch (Exception ex)
         {
-            FileName = folderPath,
-            UseShellExecute = true,
-        });
+            MessageBox.Show(this, ex.Message, "WindowsNotch", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void CloseChromeButton_Click(object sender, RoutedEventArgs e)
@@ -84,12 +93,17 @@ public partial class SettingsWindow : Window
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ChangedButton != MouseButton.Left)
+        if (e.ChangedButton != MouseButton.Left || ShouldIgnoreWindowDrag(e.OriginalSource as DependencyObject))
         {
             return;
         }
 
         DragMove();
+    }
+
+    private void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        UpdateWindowClip();
     }
 
     private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -108,5 +122,25 @@ public partial class SettingsWindow : Window
             new Rect(0, 0, WindowSurfaceBorder.ActualWidth, WindowSurfaceBorder.ActualHeight),
             SurfaceCornerRadius,
             SurfaceCornerRadius);
+    }
+
+    private static bool ShouldIgnoreWindowDrag(DependencyObject? source)
+    {
+        while (source is not null)
+        {
+            if (source is ButtonBase or Thumb)
+            {
+                return true;
+            }
+
+            source = source switch
+            {
+                Visual visual => VisualTreeHelper.GetParent(visual),
+                Visual3D visual3D => VisualTreeHelper.GetParent(visual3D),
+                _ => null,
+            };
+        }
+
+        return false;
     }
 }
