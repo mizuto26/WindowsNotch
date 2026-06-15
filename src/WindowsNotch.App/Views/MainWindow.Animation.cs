@@ -137,6 +137,8 @@ public partial class MainWindow
 
         ApplyWindowBounds(GetWindowLeft(ExpandedWidth), collapsedTop, ExpandedWidth, CollapsedHeight);
         ApplyImmediateNotchScale(GetCollapsedScaleX(), 1.0);
+        HideExpandedContentImmediately();
+        SettingsButton.Visibility = Visibility.Collapsed;
         UpdateExpandedModePresentation();
 
         UpdateOverlayMode(overlayModeActive, immediateTopUpdate: true);
@@ -225,7 +227,7 @@ public partial class MainWindow
         AnimateNotchScale(
             GetPreviewScaleX(),
             GetPreviewCollapsedScaleY(),
-            ExpandAnimationMilliseconds);
+            PreviewAnimationMilliseconds);
     }
 
     private void TransitionToExpanded(NotchExpansionStage previousStage)
@@ -244,19 +246,18 @@ public partial class MainWindow
 
         RefreshOverlayMode(isInteractive: true, immediateTopUpdate: true);
         AnimateNotchScale(1.0, 1.0, ExpandAnimationMilliseconds);
-        AnimateExpandedContentIn(ExpandAnimationMilliseconds);
+        AnimateExpandedContentIn(ExpandedContentEnterAnimationMilliseconds);
     }
 
     private void TransitionToCollapsed(NotchExpansionStage previousStage)
     {
-        SettingsButton.Visibility = Visibility.Collapsed;
-        UpdateExpandedModePresentation();
-
         if (previousStage == NotchExpansionStage.Expanded)
         {
             _isCollapseAnimationActive = true;
             _pendingCollapseOverlayModeActive = ShouldDisplayOverlayAfterCollapse();
             _collapseAnimationTimer.Stop();
+            SettingsButton.Visibility = Visibility.Visible;
+            UpdateExpandedModePresentation();
 
             if (_pendingCollapseOverlayModeActive == false)
             {
@@ -267,7 +268,7 @@ public partial class MainWindow
             }
 
             _collapseAnimationTimer.Start();
-            HideExpandedContentImmediately();
+            AnimateExpandedContentOut(ExpandedContentExitAnimationMilliseconds);
             RefreshOverlayMode(
                 isInteractive: _isDragOver || _isShareDropTargetActive || _isShelfDropTargetActive,
                 immediateTopUpdate: false);
@@ -279,6 +280,8 @@ public partial class MainWindow
         _pendingCollapseOverlayModeActive = null;
         _collapseAnimationTimer.Stop();
 
+        SettingsButton.Visibility = Visibility.Collapsed;
+        UpdateExpandedModePresentation();
         HideExpandedContentImmediately();
         ApplyWindowBounds(GetWindowLeft(ExpandedWidth), GetWindowTop(overlayModeActive: true), ExpandedWidth, CollapsedHeight);
         RefreshOverlayMode(isInteractive: false, immediateTopUpdate: false);
@@ -395,10 +398,9 @@ public partial class MainWindow
         {
             EasingMode = EasingMode.EaseOut,
         });
-        AnimateElementDimension(NotchScaleTransform, ScaleTransform.ScaleYProperty, targetScaleY, durationMilliseconds, new ExponentialEase
+        AnimateElementDimension(NotchScaleTransform, ScaleTransform.ScaleYProperty, targetScaleY, durationMilliseconds, new QuinticEase
         {
             EasingMode = EasingMode.EaseOut,
-            Exponent = 5,
         });
     }
 
@@ -412,14 +414,34 @@ public partial class MainWindow
         {
             EasingMode = EasingMode.EaseOut,
         });
-        AnimateElementDimension(ExpandedContentScaleTransform, ScaleTransform.ScaleYProperty, 1.0, durationMilliseconds, new ExponentialEase
+        AnimateElementDimension(ExpandedContentScaleTransform, ScaleTransform.ScaleYProperty, 1.0, durationMilliseconds, new QuarticEase
         {
             EasingMode = EasingMode.EaseOut,
-            Exponent = 5,
         });
         AnimateElementDimension(ExpandedContentTranslateTransform, TranslateTransform.YProperty, 0.0, durationMilliseconds, new CubicEase
         {
             EasingMode = EasingMode.EaseOut,
+        });
+    }
+
+    private void AnimateExpandedContentOut(int durationMilliseconds)
+    {
+        ExpandedContentViewport.Height = _expandedContentHeight;
+        AnimateElementDimension(ExpandedContentViewport, UIElement.OpacityProperty, 0.0, durationMilliseconds, new QuadraticEase
+        {
+            EasingMode = EasingMode.EaseIn,
+        });
+        AnimateElementDimension(ExpandedContentScaleTransform, ScaleTransform.ScaleXProperty, 0.985, durationMilliseconds, new CubicEase
+        {
+            EasingMode = EasingMode.EaseIn,
+        });
+        AnimateElementDimension(ExpandedContentScaleTransform, ScaleTransform.ScaleYProperty, 0.94, durationMilliseconds, new CubicEase
+        {
+            EasingMode = EasingMode.EaseIn,
+        });
+        AnimateElementDimension(ExpandedContentTranslateTransform, TranslateTransform.YProperty, -4.0, durationMilliseconds, new CubicEase
+        {
+            EasingMode = EasingMode.EaseIn,
         });
     }
 
