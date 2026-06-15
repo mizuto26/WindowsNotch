@@ -6,7 +6,7 @@ using WindowsNotch.App.Models;
 
 namespace WindowsNotch.App.Services;
 
-public sealed class ShelfService
+public sealed class ShelfService(ICloudDriveLocator iCloudDriveLocator)
 {
     private static readonly HashSet<string> SupportedThumbnailExtensions =
     [
@@ -17,22 +17,17 @@ public sealed class ShelfService
         ".gif",
     ];
 
-    private readonly ICloudDriveLocator _iCloudDriveLocator;
-
-    public ShelfService(ICloudDriveLocator iCloudDriveLocator)
-    {
-        _iCloudDriveLocator = iCloudDriveLocator;
-    }
-
     public IReadOnlyList<ShelfItem> LoadItems()
     {
         Directory.CreateDirectory(AppPaths.ShelfRoot);
 
-        return Directory
-            .EnumerateFileSystemEntries(AppPaths.ShelfRoot)
-            .Select(CreateShelfItem)
-            .OrderByDescending(item => item.AddedAtUtc)
-            .ToList();
+        return
+        [
+            .. Directory
+                .EnumerateFileSystemEntries(AppPaths.ShelfRoot)
+                .Select(CreateShelfItem)
+                .OrderByDescending(item => item.AddedAtUtc),
+        ];
     }
 
     public Task<IReadOnlyList<ShelfItem>> StashEntriesAsync(IEnumerable<string> entryPaths, CancellationToken cancellationToken = default)
@@ -61,7 +56,7 @@ public sealed class ShelfService
     {
         return Task.Run(() =>
         {
-            if (!_iCloudDriveLocator.TryResolveWindowsNotchFolder(out var destinationFolder))
+            if (!iCloudDriveLocator.TryResolveWindowsNotchFolder(out var destinationFolder))
             {
                 return new CopyResult(
                     false,

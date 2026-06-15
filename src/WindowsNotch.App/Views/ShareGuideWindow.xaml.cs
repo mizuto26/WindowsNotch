@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Media3D;
+using System.Windows.Controls.Primitives;
 
 namespace WindowsNotch.App;
 
@@ -12,7 +14,7 @@ public partial class ShareGuideWindow : Window
     {
         InitializeComponent();
         FolderPathTextBlock.Text = folderPathText;
-        UpdateWindowClip();
+        Loaded += Window_Loaded;
     }
 
     private void OkButton_Click(object sender, RoutedEventArgs e)
@@ -27,12 +29,17 @@ public partial class ShareGuideWindow : Window
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ChangedButton != MouseButton.Left)
+        if (e.ChangedButton != MouseButton.Left || ShouldIgnoreWindowDrag(e.OriginalSource as DependencyObject))
         {
             return;
         }
 
         DragMove();
+    }
+
+    private void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        UpdateWindowClip();
     }
 
     private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -51,5 +58,25 @@ public partial class ShareGuideWindow : Window
             new Rect(0, 0, WindowSurfaceBorder.ActualWidth, WindowSurfaceBorder.ActualHeight),
             SurfaceCornerRadius,
             SurfaceCornerRadius);
+    }
+
+    private static bool ShouldIgnoreWindowDrag(DependencyObject? source)
+    {
+        while (source is not null)
+        {
+            if (source is ButtonBase or Thumb)
+            {
+                return true;
+            }
+
+            source = source switch
+            {
+                Visual visual => VisualTreeHelper.GetParent(visual),
+                Visual3D visual3D => VisualTreeHelper.GetParent(visual3D),
+                _ => null,
+            };
+        }
+
+        return false;
     }
 }

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
 using WindowsNotch.App.Services;
@@ -7,51 +8,115 @@ namespace WindowsNotch.App;
 
 public partial class App : Application
 {
+    private int _isHandlingFatalException;
+
     protected override void OnStartup(StartupEventArgs e)
     {
+        base.OnStartup(e);
+
         DispatcherUnhandledException += App_DispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
-        base.OnStartup(e);
+        TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        DispatcherUnhandledException -= App_DispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException -= CurrentDomain_UnhandledException;
+        TaskScheduler.UnobservedTaskException -= TaskScheduler_UnobservedTaskException;
+        base.OnExit(e);
     }
 
     private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        var logPath = WriteCrashLog(e.Exception);
-        MessageBox.Show(
-            $"WindowsNotch crashed.\n\n{e.Exception}\n\nLog:\n{logPath}",
-            "WindowsNotch",
-            MessageBoxButton.OK,
-            MessageBoxImage.Error);
-
+        ShowFatalError(e.Exception, shutdownAfterClose: true);
         e.Handled = true;
-        Shutdown(-1);
     }
 
     private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
     {
         var exception = e.ExceptionObject as Exception ?? new Exception("Unknown unhandled exception.");
-        var logPath = WriteCrashLog(exception);
-
-        MessageBox.Show(
-            $"WindowsNotch crashed.\n\n{exception}\n\nLog:\n{logPath}",
-            "WindowsNotch",
-            MessageBoxButton.OK,
-            MessageBoxImage.Error);
+        ShowFatalError(exception, shutdownAfterClose: e.IsTerminating);
     }
 
-    private static string WriteCrashLog(Exception exception)
+    private void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
-        Directory.CreateDirectory(AppPaths.LogRoot);
+        ShowFatalError(e.Exception, shutdownAfterClose: false);
+        e.SetObserved();
+    }
 
-        var logPath = Path.Combine(AppPaths.LogRoot, $"crash-{DateTime.Now:yyyyMMdd-HHmmss}.log");
-        var logText =
-            $"Timestamp: {DateTime.Now:O}{Environment.NewLine}" +
-            $"OS: {Environment.OSVersion}{Environment.NewLine}" +
-            $"Process: {Environment.ProcessPath}{Environment.NewLine}" +
-            Environment.NewLine +
-            exception;
+    private void ShowFatalError(Exception exception, bool shutdownAfterClose)
+    {
+        if (Interlocked.CompareExchange(ref _isHandlingFatalException, 1, 0) != 0)
+        {
+            return;
+        }
 
-        File.WriteAllText(logPath, logText);
-        return logPath;
+        var logPath = TryWriteCrashLog(exception);
+        var message =
+            $"WindowsNotch crashed.\n\n{exception}\n\nLog:\n{logPath}";
+
+        void ShowMessage()
+        {
+            MessageBox.Show(
+                message,
+                "WindowsNotch",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+
+            if (shutdownAfterClose)
+            {
+                Shutdown(-1);
+            }
+        }
+
+        try
+        {
+            if (Dispatcher.CheckAccess())
+            {
+                ShowMessage();
+                return;
+            }
+
+            Dispatcher.Invoke(ShowMessage);
+        }
+        catch
+        {
+            MessageBox.Show(
+                message,
+                "WindowsNotch",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            if (!shutdownAfterClose)
+            {
+                Interlocked.Exchange(ref _isHandlingFatalException, 0);
+            }
+        }
+    }
+
+    private static string TryWriteCrashLog(Exception exception)
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.LogRoot);
+
+            var logPath = Path.Combine(AppPaths.LogRoot, $"crash-{DateTime.Now:yyyyMMdd-HHmmss}.log");
+            var logText =
+                $"Timestamp: {DateTime.Now:O}{Environment.NewLine}" +
+                $"OS: {Environment.OSVersion}{Environment.NewLine}" +
+                $"Process: {Environment.ProcessPath}{Environment.NewLine}" +
+                Environment.NewLine +
+                exception;
+
+            File.WriteAllText(logPath, logText);
+            return logPath;
+        }
+        catch (Exception logException)
+        {
+            return $"Crash log could not be written: {logException.Message}";
+        }
     }
 }

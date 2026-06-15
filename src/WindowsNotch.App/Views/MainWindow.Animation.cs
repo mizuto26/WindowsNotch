@@ -29,8 +29,6 @@ public partial class MainWindow
             (!_isCollapseAnimationActive && IsCursorOverNotchBody(cursorPoint)) ||
             isExpandedAreaInteractive ||
             isPostDropHoldInteractive;
-        var isInteractive = isDragInteractive || isHoverInteractive;
-
         if (_isWaitingForPostDropExit)
         {
             RefreshOverlayMode(isInteractive: true);
@@ -54,14 +52,17 @@ public partial class MainWindow
             _keepExpandedUntilUtc = null;
         }
 
-        RefreshOverlayMode(isInteractive);
-
         if (isDragInteractive)
         {
             _hoverStartedUtc = null;
             _keepExpandedUntilUtc = null;
             _lastInteractiveUtc = now;
-            SetExpansionStage(NotchExpansionStage.Expanded);
+
+            if (!SetExpansionStage(NotchExpansionStage.Expanded))
+            {
+                RefreshOverlayMode(isInteractive: true);
+            }
+
             return;
         }
 
@@ -76,7 +77,11 @@ public partial class MainWindow
                 ? NotchExpansionStage.Expanded
                 : NotchExpansionStage.Preview;
 
-            SetExpansionStage(targetStage);
+            if (!SetExpansionStage(targetStage))
+            {
+                RefreshOverlayMode(isInteractive: true);
+            }
+
             return;
         }
 
@@ -84,6 +89,7 @@ public partial class MainWindow
 
         if (!IsPresented)
         {
+            RefreshOverlayMode(isInteractive: false);
             return;
         }
 
@@ -99,10 +105,14 @@ public partial class MainWindow
 
         if (now - _lastInteractiveUtc < TimeSpan.FromMilliseconds(CollapseDelayMilliseconds))
         {
+            RefreshOverlayMode(isInteractive: false);
             return;
         }
 
-        SetExpansionStage(NotchExpansionStage.Collapsed);
+        if (!SetExpansionStage(NotchExpansionStage.Collapsed))
+        {
+            RefreshOverlayMode(isInteractive: false);
+        }
     }
 
     private void TopmostTimer_Tick(object? sender, EventArgs e)
@@ -132,7 +142,7 @@ public partial class MainWindow
         UpdateOverlayMode(overlayModeActive, immediateTopUpdate: true);
     }
 
-    private bool IsCursorInHotZone(Point cursorPoint)
+    private static bool IsCursorInHotZone(Point cursorPoint)
     {
         var centerX = SystemParameters.PrimaryScreenWidth / 2.0;
         return cursorPoint.Y <= HotZoneHeight && Math.Abs(cursorPoint.X - centerX) <= HotZoneHalfWidth;
@@ -168,18 +178,18 @@ public partial class MainWindow
                cursorPoint.Y <= windowBottom;
     }
 
-    private void SetExpansionStage(NotchExpansionStage stage)
+    private bool SetExpansionStage(NotchExpansionStage stage)
     {
         if (stage == NotchExpansionStage.Collapsed &&
             _keepExpandedUntilUtc is DateTime keepExpandedUntilUtc &&
             DateTime.UtcNow < keepExpandedUntilUtc)
         {
-            return;
+            return false;
         }
 
         if (_expansionStage == stage)
         {
-            return;
+            return false;
         }
 
         var previousStage = _expansionStage;
@@ -189,13 +199,13 @@ public partial class MainWindow
         {
             case NotchExpansionStage.Preview:
                 TransitionToPreview();
-                return;
+                return true;
             case NotchExpansionStage.Expanded:
                 TransitionToExpanded(previousStage);
-                return;
+                return true;
             default:
                 TransitionToCollapsed(previousStage);
-                return;
+                return true;
         }
     }
 
@@ -505,7 +515,7 @@ public partial class MainWindow
         return geometry;
     }
 
-    private double GetCollapsedScaleX()
+    private static double GetCollapsedScaleX()
     {
         var collapsedBodyWidth = CollapsedWidth - (WindowHorizontalMargin * 2.0);
         var expandedBodyWidth = ExpandedWidth - (WindowHorizontalMargin * 2.0);
@@ -521,7 +531,7 @@ public partial class MainWindow
             : collapsedBodyHeight / expandedBodyHeight;
     }
 
-    private double GetPreviewScaleX()
+    private static double GetPreviewScaleX()
     {
         var collapsedScaleX = GetCollapsedScaleX();
         return collapsedScaleX + ((1.0 - collapsedScaleX) * PreviewScaleProgress);

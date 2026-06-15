@@ -241,11 +241,6 @@ public partial class MainWindow
         return true;
     }
 
-    private void LoadShelfItems()
-    {
-        ReplaceShelfItems(_shelfService.LoadItems());
-    }
-
     private void ReplaceShelfItems(IEnumerable<ShelfItem> items)
     {
         var selectedPath = _selectedShelfItem?.StoredPath;
@@ -274,23 +269,23 @@ public partial class MainWindow
     private void UpdateDropZoneVisuals()
     {
         ShareDropZone.Background = _isShareDropTargetActive
-            ? new SolidColorBrush(Color.FromArgb(54, 72, 137, 255))
-            : new SolidColorBrush(Color.FromArgb(255, 0, 0, 0));
+            ? DropZoneActiveBackgroundBrush
+            : DropZoneIdleBackgroundBrush;
 
         ShareDropZone.BorderBrush = _isShareDropTargetActive
-            ? new SolidColorBrush(Color.FromArgb(120, 126, 184, 255))
+            ? DropZoneActiveBorderBrush
             : Brushes.Transparent;
 
         EmptyShelfPanel.Background = _isShelfDropTargetActive
-            ? new SolidColorBrush(Color.FromArgb(54, 72, 137, 255))
-            : new SolidColorBrush(Color.FromArgb(255, 0, 0, 0));
+            ? DropZoneActiveBackgroundBrush
+            : DropZoneIdleBackgroundBrush;
 
         EmptyShelfPanel.BorderBrush = _isShelfDropTargetActive
-            ? new SolidColorBrush(Color.FromArgb(120, 126, 184, 255))
+            ? DropZoneActiveBorderBrush
             : Brushes.Transparent;
 
         ShelfPanel.BorderBrush = _isShelfDropTargetActive
-            ? new SolidColorBrush(Color.FromArgb(90, 102, 209, 255))
+            ? ShelfPanelActiveBorderBrush
             : Brushes.Transparent;
     }
 
