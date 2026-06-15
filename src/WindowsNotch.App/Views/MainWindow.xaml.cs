@@ -143,12 +143,12 @@ public partial class MainWindow : Window
         Height = CollapsedHeight;
         ApplyImmediateNotchScale(GetCollapsedScaleX(), 1.0);
         UpdateExpandedModePresentation();
-
-        await LoadShelfItemsAsync();
         UpdateDropZoneVisuals();
         PositionWindow();
         SetShareStatusIdle();
         _hoverTimer.Start();
+
+        await LoadShelfItemsAsync();
         await InitializeMediaSessionAsync();
     }
 

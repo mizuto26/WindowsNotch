@@ -278,7 +278,6 @@ public sealed class MediaSessionService : IDisposable
 
         _currentSession = null;
         _manager = null;
-        _publishStateLock.Dispose();
     }
 
     private static GlobalSystemMediaTransportControlsSession? GetCurrentOrFirstSession(GlobalSystemMediaTransportControlsSessionManager manager)
